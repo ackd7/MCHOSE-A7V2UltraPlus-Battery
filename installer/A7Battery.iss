@@ -2,7 +2,7 @@
 ; 生成带卸载注册表项、开始菜单/桌面快捷方式、可选开机自启的 Windows 安装包
 
 #define MyAppName "A7 电量助手"
-#define MyAppVersion "1.4.0"
+#define MyAppVersion "1.5.0"
 #define MyAppPublisher "ackd7"
 #define MyAppURL "https://github.com/ackd7/A7Battery"
 #define MyAppExeName "A7Battery.exe"

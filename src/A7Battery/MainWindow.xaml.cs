@@ -22,7 +22,6 @@ public sealed partial class MainWindow : Window
 
     private TextBox[] DpiBoxes => new[] { Dpi0, Dpi1, Dpi2, Dpi3, Dpi4, Dpi5 };
     private Border[] DpiChips => new[] { DpiChip0, DpiChip1, DpiChip2, DpiChip3, DpiChip4, DpiChip5 };
-    private Button[] RateButtons => new[] { RateBtn0, RateBtn1, RateBtn2, RateBtn3, RateBtn4, RateBtn5 };
 
     public MainWindow(AppSettings settings, BatteryMonitor monitor)
     {
@@ -31,8 +30,18 @@ public sealed partial class MainWindow : Window
         _app = (App)Application.Current;
         InitializeComponent();
 
-        // 关闭按钮只隐藏到托盘，不销毁窗口（配合 OnExplicitShutdown）
+        // 关闭按钮走自绘 ExitApp；系统级关闭（Alt+F4 等）仍隐藏到托盘
         Closing += (_, e) => { e.Cancel = true; Hide(); };
+        // 最大化时去掉圆角外框的留白，还原后恢复
+        StateChanged += (_, _) =>
+        {
+            bool max = WindowState == WindowState.Maximized;
+            WindowFrame.Margin = max ? new Thickness(0) : new Thickness(10);
+            WindowFrame.CornerRadius = max ? new CornerRadius(0) : new CornerRadius(18);
+            MaximizeIcon.Kind = max
+                ? MaterialDesignThemes.Wpf.PackIconKind.WindowRestore
+                : MaterialDesignThemes.Wpf.PackIconKind.WindowMaximize;
+        };
 
         ApplySettings();
         _monitor.ReadingChanged += (_, info) => Dispatcher.Invoke(() => UpdateUI(info));
@@ -47,6 +56,28 @@ public sealed partial class MainWindow : Window
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
         Activate();
     }
+
+    // ---------- 自绘标题栏 ----------
+
+    private void TitleBar_MouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (e.ClickCount == 2) { ToggleMaximize(); return; }
+        try { DragMove(); } catch { }
+    }
+
+    private void MinimizeBtn_Click(object sender, RoutedEventArgs e) => WindowState = WindowState.Minimized;
+
+    private void MaximizeBtn_Click(object sender, RoutedEventArgs e) => ToggleMaximize();
+
+    private void ToggleMaximize()
+    {
+        WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+        MaximizeIcon.Kind = WindowState == WindowState.Maximized
+            ? MaterialDesignThemes.Wpf.PackIconKind.WindowRestore
+            : MaterialDesignThemes.Wpf.PackIconKind.WindowMaximize;
+    }
+
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => _app.ExitApp();
 
     private void ApplySettings()
     {
@@ -97,6 +128,33 @@ public sealed partial class MainWindow : Window
             btn.Click += PresetColor_Click;
             PresetSwatches.Children.Add(btn);
         }
+
+        // 自选颜色色块
+        var gradient = new LinearGradientBrush(
+            new GradientStopCollection
+            {
+                new GradientStop(Color.FromRgb(0xE5, 0x40, 0x5D), 0.0),
+                new GradientStop(Color.FromRgb(0xFF, 0xB3, 0x00), 0.33),
+                new GradientStop(Color.FromRgb(0x21, 0xB6, 0x6C), 0.66),
+                new GradientStop(Color.FromRgb(0x42, 0xA5, 0xF5), 1.0)
+            }, new Point(0, 0), new Point(1, 1));
+        var custom = new System.Windows.Controls.Button
+        {
+            Width = 30, Height = 30,
+            Margin = new Thickness(0, 0, 8, 8),
+            Cursor = System.Windows.Input.Cursors.Hand,
+            ToolTip = "自选颜色（RGB / HEX）",
+            Content = "+",
+            FontSize = 17, FontWeight = FontWeights.SemiBold,
+            Foreground = Brushes.White,
+            Background = gradient,
+            BorderBrush = Res("A7.OutlineVariant"),
+            BorderThickness = new Thickness(1),
+            Template = MakeSwatchTemplate()
+        };
+        custom.Click += CustomColor_Click;
+        PresetSwatches.Children.Add(custom);
+
         RefreshThemeUI();
     }
 
@@ -174,6 +232,22 @@ public sealed partial class MainWindow : Window
             _settings.ThemeMode = ThemeMode.Static;
             _settings.Save();
             ApplyThemeAndRefresh(ThemeService.ParseHex(hex));
+        }
+    }
+
+    private void CustomColor_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new ColorPickerWindow(ThemeService.ParseHex(_settings.StaticSeedColor))
+        {
+            Owner = this
+        };
+        if (picker.ShowDialog() == true)
+        {
+            string hex = ThemeService.ToHex(picker.ResultColor);
+            _settings.StaticSeedColor = hex;
+            _settings.ThemeMode = ThemeMode.Static;
+            _settings.Save();
+            ApplyThemeAndRefresh(picker.ResultColor);
         }
     }
 
@@ -261,12 +335,21 @@ public sealed partial class MainWindow : Window
 
     private void HighlightRate()
     {
-        for (int i = 0; i < 6; i++)
-        {
-            bool active = i == _selectedRateIndex;
-            RateButtons[i].Background = active ? Res("A7.Primary") : Res("A7.SurfaceContainer");
-            RateButtons[i].Foreground = active ? Brushes.White : Res("A7.OnSurfaceVariant");
-        }
+        double val = Math.Clamp(_selectedRateIndex, 0, 5);
+        if (Math.Abs(RateSlider.Value - val) > 0.01) RateSlider.Value = val;
+        UpdateRateText();
+    }
+
+    private void UpdateRateText()
+    {
+        int idx = Math.Clamp((int)Math.Round(RateSlider.Value), 0, MouseConfigService.RateHz.Length - 1);
+        RateValueText.Text = MouseConfigService.RateHz[idx] + " Hz";
+    }
+
+    private void RateSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        _selectedRateIndex = Math.Clamp((int)Math.Round(e.NewValue), 0, 5);
+        UpdateRateText();
     }
 
     private void UpdateActiveStageText()
@@ -281,15 +364,6 @@ public sealed partial class MainWindow : Window
         {
             _activeDpiIndex = idx;
             HighlightDpiStages();
-        }
-    }
-
-    private void RateBtn_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button b && int.TryParse(b.Tag?.ToString(), out int idx) && idx >= 0 && idx < 6)
-        {
-            _selectedRateIndex = idx;
-            HighlightRate();
         }
     }
 

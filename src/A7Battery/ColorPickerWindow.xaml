@@ -1,0 +1,94 @@
+<Window x:Class="A7Battery.ColorPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        Title="自选颜色" Width="400" Height="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        FontFamily="Roboto, Microsoft YaHei UI"
+        TextElement.Foreground="{DynamicResource A7.OnSurface}"
+        TextElement.FontSize="13">
+
+    <Border Margin="10" CornerRadius="20" Background="{DynamicResource A7.Background}" SnapsToDevicePixels="True">
+        <Border.Effect>
+            <DropShadowEffect Color="#1F2937" BlurRadius="18" ShadowDepth="3" Opacity="0.22"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- 标题栏（可拖动） -->
+            <Border Grid.Row="0" Height="52" CornerRadius="20,20,0,0"
+                    Background="{DynamicResource A7.Surface}"
+                    BorderBrush="{DynamicResource A7.Divider}" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="18,0,12,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="Palette" Width="18" Height="18"
+                                                 Foreground="{DynamicResource A7.Primary}"
+                                                 VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="自选颜色" FontSize="15" FontWeight="Medium"
+                                   Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button HorizontalAlignment="Right" Width="30" Height="30" ToolTip="关闭"
+                            Click="CancelBtn_Click" Background="Transparent" BorderThickness="0" Cursor="Hand">
+                        <materialDesign:PackIcon Kind="Close" Width="15" Height="15"/>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20,16,20,20">
+                    <!-- 预览 -->
+                    <Border x:Name="Preview" Height="90" CornerRadius="16"
+                            Background="{DynamicResource A7.Primary}" Margin="0,0,0,16">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" BlurRadius="10" ShadowDepth="2" Opacity="0.12"/>
+                        </Border.Effect>
+                        <TextBlock x:Name="PreviewHex" Text="#6750A4" FontSize="18" FontWeight="SemiBold"
+                                   Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+
+                    <!-- RGB 滑条 -->
+                    <StackPanel Margin="0,0,0,6">
+                        <Grid><TextBlock Text="红 (R)" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}"/><TextBlock x:Name="RValue" Text="103" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource A7.OnSurface}"/></Grid>
+                        <Slider x:Name="RSlider" Minimum="0" Maximum="255" Value="103" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="Rgb_ValueChanged"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,6">
+                        <Grid><TextBlock Text="绿 (G)" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}"/><TextBlock x:Name="GValue" Text="80" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource A7.OnSurface}"/></Grid>
+                        <Slider x:Name="GSlider" Minimum="0" Maximum="255" Value="80" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="Rgb_ValueChanged"/>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,14">
+                        <Grid><TextBlock Text="蓝 (B)" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}"/><TextBlock x:Name="BValue" Text="164" HorizontalAlignment="Right" FontSize="12" Foreground="{DynamicResource A7.OnSurface}"/></Grid>
+                        <Slider x:Name="BSlider" Minimum="0" Maximum="255" Value="164" TickFrequency="1" IsSnapToTickEnabled="True" ValueChanged="Rgb_ValueChanged"/>
+                    </StackPanel>
+
+                    <!-- Hex 输入 -->
+                    <TextBlock Text="十六进制 (HEX)" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,0,0,6"/>
+                    <TextBox x:Name="HexBox" Text="#6750A4" FontSize="14" Padding="12,8"
+                             BorderBrush="{DynamicResource A7.OutlineVariant}" BorderThickness="1"
+                             Background="{DynamicResource A7.SurfaceContainer}"
+                             Foreground="{DynamicResource A7.OnSurface}"
+                             TextChanged="HexBox_TextChanged"/>
+
+                    <TextBlock Text="提示：可直接输入 #RRGGBB，或拖动滑条调整"
+                               FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,6,0,16" TextWrapping="Wrap"/>
+
+                    <Grid>
+                        <Button Content="取消" HorizontalAlignment="Left" Width="110" Padding="0,8"
+                                Click="CancelBtn_Click" Background="{DynamicResource A7.SurfaceContainer}"
+                                Foreground="{DynamicResource A7.OnSurface}" BorderThickness="0" Cursor="Hand"/>
+                        <Button x:Name="OkBtn" Content="使用此颜色" HorizontalAlignment="Right" Width="140" Padding="0,8"
+                                Click="OkBtn_Click" Background="{DynamicResource A7.Primary}"
+                                Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                    </Grid>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Border>
+</Window>

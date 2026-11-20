@@ -5,7 +5,10 @@
         Title="A7 电量助手" Height="700" Width="470"
         MinHeight="560" MinWidth="410"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource A7.Background}"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        ResizeMode="CanResize"
+        Background="Transparent"
         FontFamily="Roboto, Microsoft YaHei UI"
         TextElement.Foreground="{DynamicResource A7.OnSurface}"
         TextElement.FontWeight="Regular"
@@ -44,6 +47,45 @@
             <Setter Property="InputScope" Value="Number"/>
         </Style>
 
+        <!-- 自绘窗口按钮 -->
+        <Style x:Key="WindowBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource A7.OnSurfaceVariant}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="8" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource A7.SurfaceVariant}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="WindowBtnClose" TargetType="Button" BasedOn="{StaticResource WindowBtn}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="8" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#D32F2F"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- 回报率分段按钮 -->
         <Style x:Key="RateChip" TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource A7.SurfaceContainer}"/>
@@ -64,23 +106,52 @@
         </Style>
     </Window.Resources>
 
-    <Grid>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" ResizeBorderThickness="6"
+                      UseAeroCaptionButtons="False" CornerRadius="0" GlassFrameThickness="0"/>
+    </WindowChrome.WindowChrome>
 
-        <!-- 顶栏 (MD3 TopAppBar) -->
-        <Border Grid.Row="0" Height="56" Background="{DynamicResource A7.Surface}"
-                BorderBrush="{DynamicResource A7.Divider}" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
-                <materialDesign:PackIcon Kind="BatteryCharging" Width="22" Height="22"
-                                         Foreground="{DynamicResource A7.Primary}"
-                                         VerticalAlignment="Center" Margin="0,0,12,0"/>
-                <TextBlock Text="A7 电量助手" FontSize="17" FontWeight="Medium"
-                           Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
-            </StackPanel>
-        </Border>
+    <!-- 圆角外框 + 阴影（自绘窗口） -->
+    <Border x:Name="WindowFrame" Margin="10" CornerRadius="18" Background="{DynamicResource A7.Background}" SnapsToDevicePixels="True">
+        <Border.Effect>
+            <DropShadowEffect Color="#1F2937" BlurRadius="18" ShadowDepth="3" Opacity="0.22"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- 顶栏 (自绘标题栏，可拖动) -->
+            <Border x:Name="TitleBar" Grid.Row="0" Height="52" CornerRadius="18,18,0,0"
+                    Background="{DynamicResource A7.Surface}"
+                    BorderBrush="{DynamicResource A7.Divider}" BorderThickness="0,0,0,1"
+                    MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                <Grid Margin="18,0,8,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <materialDesign:PackIcon Kind="BatteryCharging" Width="20" Height="20"
+                                                 Foreground="{DynamicResource A7.Primary}"
+                                                 VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Text="A7 电量助手" FontSize="15" FontWeight="Medium"
+                                   Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <!-- 自绘窗口按钮 -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Button x:Name="MinimizeBtn" Width="34" Height="34" ToolTip="最小化"
+                                Click="MinimizeBtn_Click" Style="{StaticResource WindowBtn}">
+                            <materialDesign:PackIcon Kind="Minus" Width="16" Height="16"/>
+                        </Button>
+                        <Button x:Name="MaximizeBtn" Width="34" Height="34" ToolTip="最大化/还原"
+                                Click="MaximizeBtn_Click" Style="{StaticResource WindowBtn}">
+                            <materialDesign:PackIcon x:Name="MaximizeIcon" Kind="WindowMaximize" Width="14" Height="14"/>
+                        </Button>
+                        <Button x:Name="CloseBtn" Width="34" Height="34" ToolTip="关闭"
+                                Click="CloseBtn_Click" Style="{StaticResource WindowBtnClose}">
+                            <materialDesign:PackIcon Kind="Close" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
 
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="16,16,16,24">
@@ -306,20 +377,32 @@
                                        Foreground="{DynamicResource A7.Primary}" FontWeight="SemiBold"/>
                         </Grid>
 
-                        <!-- 回报率：6 个横向分段按钮 -->
-                        <Grid Margin="0,0,0,8">
+                        <!-- 回报率：滑条档位 -->
+                        <Grid Margin="0,0,0,4">
                             <TextBlock Text="回报率 (Polling Rate)" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}" VerticalAlignment="Center"/>
-                            <TextBlock Text="仅 2.4G / 有线支持高回报率，蓝牙固定 1K" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"
-                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="RateValueText" Text="1000 Hz" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource A7.Primary}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                         </Grid>
-                        <UniformGrid Rows="1" Columns="6" Margin="0,0,0,12">
-                            <Button x:Name="RateBtn0" Content="125" Tag="0" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
-                            <Button x:Name="RateBtn1" Content="500" Tag="1" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
-                            <Button x:Name="RateBtn2" Content="1K" Tag="2" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
-                            <Button x:Name="RateBtn3" Content="2K" Tag="3" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
-                            <Button x:Name="RateBtn4" Content="4K" Tag="4" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
-                            <Button x:Name="RateBtn5" Content="8K" Tag="5" Style="{StaticResource RateChip}" Margin="0,0,0,0" Click="RateBtn_Click"/>
-                        </UniformGrid>
+                        <Border Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="14" Padding="14,8,14,6" Margin="0,2,0,12">
+                            <StackPanel>
+                                <Slider x:Name="RateSlider" Minimum="0" Maximum="5" Value="2"
+                                        TickFrequency="1" IsSnapToTickEnabled="True"
+                                        SmallChange="1" LargeChange="1"
+                                        Height="28" ValueChanged="RateSlider_ValueChanged"/>
+                                <Grid Margin="0,-2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                                        <ColumnDefinition/><ColumnDefinition/><ColumnDefinition/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="125" FontSize="9" TextAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                    <TextBlock Grid.Column="1" Text="500" FontSize="9" TextAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                    <TextBlock Grid.Column="2" Text="1K" FontSize="9" TextAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                    <TextBlock Grid.Column="3" Text="2K" FontSize="9" TextAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                    <TextBlock Grid.Column="4" Text="4K" FontSize="9" TextAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                    <TextBlock Grid.Column="5" Text="8K" FontSize="9" TextAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
 
                         <Grid>
                             <Button x:Name="ApplyDpiBtn" Content="应用 DPI" HorizontalAlignment="Left"
@@ -418,5 +501,6 @@
                            Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
             </StackPanel>
         </ScrollViewer>
-    </Grid>
+        </Grid>
+    </Border>
 </Window>
