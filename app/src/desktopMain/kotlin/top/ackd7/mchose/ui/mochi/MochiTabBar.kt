@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.ui.mochi
+package top.ackd7.mchose.ui.mochi
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring

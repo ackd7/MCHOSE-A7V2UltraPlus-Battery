@@ -1,4 +1,4 @@
-package top.ackd7.a7battery
+package top.ackd7.mchose
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -45,17 +45,17 @@ import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import top.ackd7.a7battery.services.AppSettings
-import top.ackd7.a7battery.services.BatteryInfo
-import top.ackd7.a7battery.services.BatteryMonitor
-import top.ackd7.a7battery.services.NativeTrayIcon
-import top.ackd7.a7battery.services.UpdateChecker
-import top.ackd7.a7battery.services.UpdateInfo
-import top.ackd7.a7battery.ui.App
+import top.ackd7.mchose.services.AppSettings
+import top.ackd7.mchose.services.BatteryInfo
+import top.ackd7.mchose.services.BatteryMonitor
+import top.ackd7.mchose.services.NativeTrayIcon
+import top.ackd7.mchose.services.UpdateChecker
+import top.ackd7.mchose.services.UpdateInfo
+import top.ackd7.mchose.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.1.2"
+const val APP_VERSION = "3.1.3"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"

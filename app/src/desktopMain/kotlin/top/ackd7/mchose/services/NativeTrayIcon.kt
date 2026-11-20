@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.services
+package top.ackd7.mchose.services
 
 import java.awt.Color
 import java.awt.Font

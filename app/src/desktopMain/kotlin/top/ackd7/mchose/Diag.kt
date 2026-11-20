@@ -1,9 +1,9 @@
-package top.ackd7.a7battery
+package top.ackd7.mchose
 
-import top.ackd7.a7battery.interop.HidNative
-import top.ackd7.a7battery.services.MchoseBatteryReader
-import top.ackd7.a7battery.services.MouseConfigService
-import top.ackd7.a7battery.services.UpdateChecker
+import top.ackd7.mchose.interop.HidNative
+import top.ackd7.mchose.services.MchoseBatteryReader
+import top.ackd7.mchose.services.MouseConfigService
+import top.ackd7.mchose.services.UpdateChecker
 
 /**
  * 本地诊断入口（不打包进发布产物，仅用于开发调试）。
@@ -123,12 +123,12 @@ fun main() {
         svc.read()
         svc.setRate(3)
         Thread.sleep(400)
-        val dev = top.ackd7.a7battery.interop.HidNative.enumerate()
+        val dev = top.ackd7.mchose.interop.HidNative.enumerate()
             .firstOrNull { it.vendorId == 0x3837 && it.usagePage == 0xFF01 }
         if (dev == null) {
             println("  未找到 FF01 通道")
         } else {
-            top.ackd7.a7battery.interop.HidNative.HidSession(dev.path, 65).use { sess ->
+            top.ackd7.mchose.interop.HidNative.HidSession(dev.path, 65).use { sess ->
                 sess.flush(20)
                 // bond
                 val bond = ByteArray(65) { 0xFF.toByte() }

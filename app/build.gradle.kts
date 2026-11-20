@@ -50,7 +50,7 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "top.ackd7.a7battery.MainKt"
+        mainClass = "top.ackd7.mchose.MainKt"
         // JNA 需要 native access 权限（JDK 17+）
         jvmArgs += listOf("--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8")
 
@@ -86,7 +86,7 @@ tasks.register<JavaExec>("diag") {
     description = "本地 HID 诊断：枚举设备并打印读取细节"
     val desktopMain = kotlin.targets.getByName("desktop").compilations.getByName("main")
     dependsOn(tasks.named("desktopMainClasses"))
-    mainClass.set("top.ackd7.a7battery.DiagKt")
+    mainClass.set("top.ackd7.mchose.DiagKt")
     classpath = files(desktopMain.output.allOutputs, desktopMain.runtimeDependencyFiles)
     jvmArgs("--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8")
 }

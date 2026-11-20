@@ -104,7 +104,7 @@ makensis /DAPP_VERSION=3.1.2 installer/setup.nsi
 ## 目录结构
 
 ```
-app/src/desktopMain/kotlin/top/ackd7/a7battery/
+app/src/desktopMain/kotlin/top/ackd7/mchose/
 ├── Main.kt                     # 入口：窗口、托盘、监控编排、低电量提醒
 ├── interop/HidNative.kt        # HID 枚举与 Feature 读写（JNA）
 ├── services/

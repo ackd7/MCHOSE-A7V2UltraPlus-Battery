@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.ui
+package top.ackd7.mchose.ui
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.CubicBezierEasing
@@ -61,23 +61,23 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import top.ackd7.a7battery.APP_VERSION
-import top.ackd7.a7battery.services.AppSettings
-import top.ackd7.a7battery.services.Autostart
-import top.ackd7.a7battery.services.BatteryInfo
-import top.ackd7.a7battery.services.BatteryMonitor
-import top.ackd7.a7battery.services.ConnectionMode
-import top.ackd7.a7battery.services.MouseConfigService
-import top.ackd7.a7battery.services.UpdateInfo
-import top.ackd7.a7battery.ui.mochi.Check
-import top.ackd7.a7battery.ui.mochi.MochiButtonRow
-import top.ackd7.a7battery.ui.mochi.MochiDropdownRow
-import top.ackd7.a7battery.ui.mochi.MochiRow
-import top.ackd7.a7battery.ui.mochi.MochiSection
-import top.ackd7.a7battery.ui.mochi.MochiSwitch
-import top.ackd7.a7battery.ui.mochi.MochiTab
-import top.ackd7.a7battery.ui.mochi.MochiTabBar
-import top.ackd7.a7battery.ui.mochi.rememberMochiColors
+import top.ackd7.mchose.APP_VERSION
+import top.ackd7.mchose.services.AppSettings
+import top.ackd7.mchose.services.Autostart
+import top.ackd7.mchose.services.BatteryInfo
+import top.ackd7.mchose.services.BatteryMonitor
+import top.ackd7.mchose.services.ConnectionMode
+import top.ackd7.mchose.services.MouseConfigService
+import top.ackd7.mchose.services.UpdateInfo
+import top.ackd7.mchose.ui.mochi.Check
+import top.ackd7.mchose.ui.mochi.MochiButtonRow
+import top.ackd7.mchose.ui.mochi.MochiDropdownRow
+import top.ackd7.mchose.ui.mochi.MochiRow
+import top.ackd7.mchose.ui.mochi.MochiSection
+import top.ackd7.mchose.ui.mochi.MochiSwitch
+import top.ackd7.mchose.ui.mochi.MochiTab
+import top.ackd7.mchose.ui.mochi.MochiTabBar
+import top.ackd7.mchose.ui.mochi.rememberMochiColors
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
@@ -113,7 +113,7 @@ fun App(
     var showAbout by remember { mutableStateOf(false) }
     // 开发用：--about 启动即打开关于弹窗
     LaunchedEffect(Unit) {
-        if (top.ackd7.a7battery.appArgsContains("--about")) showAbout = true
+        if (top.ackd7.mchose.appArgsContains("--about")) showAbout = true
     }
 
     AppTheme(themeModeOf(themeMode)) {
@@ -122,11 +122,11 @@ fun App(
         val mouseState = rememberMouseConfigUiState(settings)
 
         LaunchedEffect(Unit) {
-            top.ackd7.a7battery.appLog("UI 已组合（横向自适应布局）")
+            top.ackd7.mchose.appLog("UI 已组合（横向自适应布局）")
             mouseState.refresh()
         }
 
-        LaunchedEffect(page) { top.ackd7.a7battery.appLog("切换到页面 $page") }
+        LaunchedEffect(page) { top.ackd7.mchose.appLog("切换到页面 $page") }
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -963,7 +963,7 @@ private fun AboutOverlay(onClose: () -> Unit) {
                 )
                 .padding(20.dp),
         ) {
-            Text(top.ackd7.a7battery.APP_NAME, fontSize = 16.sp, color = c.text)
+            Text(top.ackd7.mchose.APP_NAME, fontSize = 16.sp, color = c.text)
             Spacer(Modifier.height(4.dp))
             Text("v$APP_VERSION", fontSize = 13.sp, color = c.secondary)
             Spacer(Modifier.height(16.dp))

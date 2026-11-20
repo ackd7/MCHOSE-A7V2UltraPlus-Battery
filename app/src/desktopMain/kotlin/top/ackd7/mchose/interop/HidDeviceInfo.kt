@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.interop
+package top.ackd7.mchose.interop
 
 /**
  * HID 设备信息（对应原 C# 的 HidDeviceInfo）。

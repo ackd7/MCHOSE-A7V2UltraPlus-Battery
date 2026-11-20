@@ -1,7 +1,7 @@
-package top.ackd7.a7battery.services
+package top.ackd7.mchose.services
 
-import top.ackd7.a7battery.interop.HidDeviceInfo
-import top.ackd7.a7battery.interop.HidNative
+import top.ackd7.mchose.interop.HidDeviceInfo
+import top.ackd7.mchose.interop.HidNative
 
 /**
  * 鼠标配置读取结果（对应原 C# MouseConfig）。

@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.interop
+package top.ackd7.mchose.interop
 
 import com.sun.jna.Library
 import com.sun.jna.Native

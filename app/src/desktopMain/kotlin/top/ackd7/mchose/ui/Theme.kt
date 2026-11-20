@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.ui
+package top.ackd7.mchose.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember

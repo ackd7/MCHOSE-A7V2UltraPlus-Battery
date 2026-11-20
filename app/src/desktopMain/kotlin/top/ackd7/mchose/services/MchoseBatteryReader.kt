@@ -1,7 +1,7 @@
-package top.ackd7.a7battery.services
+package top.ackd7.mchose.services
 
-import top.ackd7.a7battery.interop.HidDeviceInfo
-import top.ackd7.a7battery.interop.HidNative
+import top.ackd7.mchose.interop.HidDeviceInfo
+import top.ackd7.mchose.interop.HidNative
 
 /**
  * 迈从 A7 V2 Ultra+ 电量读取（本机实机逆向验证，对应原 C# MchoseBatteryReader）。

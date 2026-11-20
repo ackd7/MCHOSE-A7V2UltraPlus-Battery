@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.services
+package top.ackd7.mchose.services
 
 import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.WinReg

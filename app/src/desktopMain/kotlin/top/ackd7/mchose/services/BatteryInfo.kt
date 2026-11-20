@@ -1,4 +1,4 @@
-package top.ackd7.a7battery.services
+package top.ackd7.mchose.services
 
 /**
  * 连接方式（对应原 C# ConnectionMode）。
