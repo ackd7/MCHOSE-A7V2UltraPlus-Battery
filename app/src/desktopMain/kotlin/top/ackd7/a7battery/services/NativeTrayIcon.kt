@@ -3,6 +3,7 @@ package top.ackd7.a7battery.services
 import java.awt.Color
 import java.awt.Font
 import java.awt.Graphics2D
+import java.awt.GraphicsEnvironment
 import java.awt.MenuItem
 import java.awt.PopupMenu
 import java.awt.RenderingHints
@@ -48,14 +49,35 @@ class NativeTrayIcon : AutoCloseable {
         })
 
         // 右键菜单
-        val menu = PopupMenu()
-        menu.add(MenuItem("打开面板").apply { addActionListener { onOpen?.invoke() } })
-        menu.add(MenuItem("立即刷新").apply { addActionListener { onRefresh?.invoke() } })
+        // 注意：AWT 的 PopupMenu 默认字体（getFont() == null）在裁剪过的 JRE 里
+        // 会回落到不含中文字形的原生字体，菜单中文会显示成方块。
+        // 这里显式指定一个能显示中文的字体。
+        val menuFont = cjkFont(12)
+        val menu = PopupMenu().apply { font = menuFont }
+        val itemOpen = MenuItem("打开面板").apply { font = menuFont; addActionListener { onOpen?.invoke() } }
+        val itemRefresh = MenuItem("立即刷新").apply { font = menuFont; addActionListener { onRefresh?.invoke() } }
+        val itemExit = MenuItem("退出").apply { font = menuFont; addActionListener { onExit?.invoke() } }
+        menu.add(itemOpen)
+        menu.add(itemRefresh)
         menu.addSeparator()
-        menu.add(MenuItem("退出").apply { addActionListener { onExit?.invoke() } })
+        menu.add(itemExit)
         trayIcon.popupMenu = menu
 
         SystemTray.getSystemTray().add(trayIcon)
+    }
+
+    /** 选一个能显示中文的字体（优先微软雅黑）。 */
+    private fun cjkFont(size: Int): Font {
+        val candidates = listOf("Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "SimSun", "Dialog")
+        val available = runCatching {
+            GraphicsEnvironment.getLocalGraphicsEnvironment().availableFontFamilyNames.toSet()
+        }.getOrDefault(emptySet())
+        for (name in candidates) {
+            if (name != "Dialog" && name !in available) continue
+            val f = Font(name, Font.PLAIN, size)
+            if (f.canDisplay('打')) return f
+        }
+        return Font(Font.DIALOG, Font.PLAIN, size)
     }
 
     fun setIcon(percent: Int?, charging: Boolean, tip: String) {

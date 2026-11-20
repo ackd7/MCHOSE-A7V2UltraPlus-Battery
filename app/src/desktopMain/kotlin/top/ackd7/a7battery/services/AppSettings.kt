@@ -48,7 +48,7 @@ data class AppSettings(
     private fun normalize(): AppSettings {
         if (dpiStages.size != 6) dpiStages = intArrayOf(400, 800, 1600, 3200, 6400, 26000)
         for (i in dpiStages.indices) {
-            if (dpiStages[i] !in 100..30000) dpiStages[i] = 800
+            if (dpiStages[i] !in 100..42000) dpiStages[i] = 800
         }
         activeDpiIndex = activeDpiIndex.coerceIn(0, 5)
         if (rateHz < 125) rateHz = 1000

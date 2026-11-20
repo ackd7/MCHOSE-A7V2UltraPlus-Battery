@@ -11,7 +11,7 @@ plugins {
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突
 val appVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "2.0.0"
+    ?: "2.0.2"
 
 kotlin {
     jvm("desktop")
@@ -49,9 +49,8 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "top.ackd7.a7battery.MainKt"
-
         // JNA 需要 native access 权限（JDK 17+）
-        jvmArgs += listOf("--enable-native-access=ALL-UNNAMED")
+        jvmArgs += listOf("--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8")
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
@@ -69,4 +68,15 @@ compose.desktop {
             }
         }
     }
+}
+
+// 开发用：本地 HID 诊断（不参与发布打包）
+tasks.register<JavaExec>("diag") {
+    group = "verification"
+    description = "本地 HID 诊断：枚举设备并打印读取细节"
+    val desktopMain = kotlin.targets.getByName("desktop").compilations.getByName("main")
+    dependsOn(tasks.named("desktopMainClasses"))
+    mainClass.set("top.ackd7.a7battery.DiagKt")
+    classpath = files(desktopMain.output.allOutputs, desktopMain.runtimeDependencyFiles)
+    jvmArgs("--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8")
 }

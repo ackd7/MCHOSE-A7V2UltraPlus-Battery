@@ -81,16 +81,14 @@ class MouseConfigService {
 
                 send(s, ridShort, cmdBond, null)
                 Thread.sleep(120)
-                if (!waitAck(s, cmdBond, 1000)) {
-                    r.error = "唤醒无应答，请轻动鼠标后重试"
-                    continue
-                }
+                // bond 的 ACK 尽力消费但不作为硬条件（部分固件不回 ACK）
+                waitAck(s, cmdBond, 600)
 
                 send(s, ridLong, cmdConfigRead, null)
                 Thread.sleep(100)
                 waitAck(s, cmdConfigRead, 200)
 
-                val payload = readFeature(s, ridLong, cmdConfigRead, 6)
+                val payload = readFeature(s, ridLong, cmdConfigRead, 8)
                 if (payload == null) {
                     r.error = "配置读取无应答"
                     continue
@@ -135,7 +133,7 @@ class MouseConfigService {
         args[2] = 0
         var active = 0
         for (i in 0 until 6) {
-            val v = stages[i].coerceIn(100, 30000)
+            val v = stages[i].coerceIn(100, 42000)
             args[3 + i * 2] = (v and 0xFF).toByte()
             args[4 + i * 2] = ((v shr 8) and 0xFF).toByte()
             if (v > 0) active++
@@ -159,13 +157,11 @@ class MouseConfigService {
         for (dev in devices) {
             try {
                 HidNative.HidSession(dev.path, maxOf(dev.inputReportLength, featureLen)).use { s ->
-                    s.flush(15)
+                    s.flush(20)
                     send(s, ridShort, cmdBond, null)
                     Thread.sleep(120)
-                    if (!waitAck(s, cmdBond, 1000)) {
-                        last = Exception("唤醒无应答，请轻动鼠标后重试")
-                        return@use
-                    }
+                    // 唤醒 ACK 尽力消费，不作硬条件
+                    waitAck(s, cmdBond, 600)
 
                     send(s, rid, cmd, args)
                     Thread.sleep(80)

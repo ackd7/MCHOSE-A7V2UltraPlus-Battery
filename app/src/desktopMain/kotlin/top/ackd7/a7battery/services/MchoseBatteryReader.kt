@@ -73,60 +73,59 @@ class MchoseBatteryReader {
     }
 
     private fun readOne(dev: HidDeviceInfo): BatteryInfo {
-        val r = BatteryInfo(updatedAt = System.currentTimeMillis(), strategy = "ACK")
+        val r = BatteryInfo(updatedAt = System.currentTimeMillis(), strategy = "poll")
         HidNative.HidSession(dev.path, maxOf(dev.inputReportLength, featureLen)).use { s ->
             for (cycle in 0 until 3) {
-                if (cycle > 0) Thread.sleep(180)
+                if (cycle > 0) Thread.sleep(150)
 
-                s.flush(15)
+                s.flush(20)
 
+                // 1) bond 唤醒。ACK 尽力消费但不作为硬条件：
+                //    A7 V2 Ultra+ 只对 bond 回 ACK，部分固件干脆不回。
                 send(s, cmdBond)
                 Thread.sleep(120)
-                if (!waitAck(s, cmdBond, 1200)) {
-                    r.error = "bond 无应答（设备休眠？轻动鼠标后重试）"
-                    continue
-                }
+                waitAck(s, cmdBond, 600)
 
+                // 2) ost 查询。实机验证：A7 V2 Ultra+ 对 ost 不产生中断-IN ACK，
+                //    因此不能等 ACK，改为发完立即轮询 GET_FEATURE（两 bank 交替返回）。
                 send(s, cmdOst)
-                if (!waitAck(s, cmdOst, 1200)) {
-                    r.error = "ost 查询无应答（设备休眠？）"
-                    continue
-                }
 
-                for (k in 0 until 6) {
-                    val payload = getPayload(s)
-                    if (payload != null) {
-                        r.raw = hex(payload, 16)
-                        val vid = payload[0].toInt() and 0xFF or ((payload[1].toInt() and 0xFF) shl 8)
-                        val flags = payload[8].toInt() and 0xFF
-                        val level = payload[9].toInt() and 0xFF
-                        val charge = payload[10].toInt() and 0xFF
+                for (k in 0 until 8) {
+                    Thread.sleep(80)
+                    waitAck(s, cmdOst, 20) // 若固件确实发了 ACK，顺手消费掉
 
-                        if (vid == MchoseVid && level in 1..100) {
-                            r.percent = level
-                            r.charging = charge != 0
-                            r.mode = when (flags and 7) {
-                                0 -> ConnectionMode.Usb
-                                1 -> ConnectionMode.Radio24G
-                                2 -> ConnectionMode.Bluetooth
-                                else -> ConnectionMode.Unknown
-                            }
-                            r.deviceName = if (dev.productName.isBlank())
-                                "MCHOSE ${dev.vendorId.toString(16).uppercase()}:${dev.productId.toString(16).uppercase()}"
-                            else dev.productName
-                            r.vendorId = dev.vendorId.toString(16).uppercase().padStart(4, '0')
-                            r.productId = dev.productId.toString(16).uppercase().padStart(4, '0')
-                            r.lastPath = dev.path
-                            r.success = true
-                            r.error = ""
-                            return r
+                    val payload = getPayload(s) ?: continue
+                    r.raw = hex(payload, 16)
+                    val vid = (payload[0].toInt() and 0xFF) or ((payload[1].toInt() and 0xFF) shl 8)
+                    val flags = payload[8].toInt() and 0xFF
+                    val level = payload[9].toInt() and 0xFF
+                    val charge = payload[10].toInt() and 0xFF
+
+                    if (vid == MchoseVid && level in 1..100) {
+                        r.percent = level
+                        r.charging = charge != 0
+                        r.mode = when (flags and 7) {
+                            0, 4 -> ConnectionMode.Usb // 有线；A7 V2 Ultra+ 有线实测 flags&7 = 4
+                            1 -> ConnectionMode.Radio24G
+                            2 -> ConnectionMode.Bluetooth
+                            else -> ConnectionMode.Unknown
                         }
+                        r.deviceName = if (dev.productName.isBlank())
+                            "MCHOSE ${dev.vendorId.toString(16).uppercase()}:${dev.productId.toString(16).uppercase()}"
+                        else dev.productName
+                        r.vendorId = dev.vendorId.toString(16).uppercase().padStart(4, '0')
+                        r.productId = dev.productId.toString(16).uppercase().padStart(4, '0')
+                        r.lastPath = dev.path
+                        r.success = true
+                        r.error = ""
+                        return r
                     }
-                    Thread.sleep(60)
                 }
             }
             if (r.error.isBlank()) {
-                r.error = if (r.raw.isBlank()) "未读到有效的 feature 报告" else "数据无效 raw=${r.raw}"
+                r.error = if (r.raw.isBlank())
+                    "未读到 feature 报告（设备可能深度休眠，轻动鼠标后重试）"
+                else "数据无效 raw=${r.raw}"
             }
         }
         return r
