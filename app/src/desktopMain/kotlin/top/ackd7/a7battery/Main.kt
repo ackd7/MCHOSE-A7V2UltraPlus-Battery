@@ -55,7 +55,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.9"
+const val APP_VERSION = "2.0.10"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -145,9 +145,17 @@ fun main(args: Array<String>) {
             }
 
             var lastLogged = ""
+            var lastGood: BatteryInfo? = null
             monitor.onReadingChanged = { info ->
-                battery = info
-                val brief = "ok=${info.success} pct=${info.percent} err=${info.error}"
+                // 设备休眠时固件会返回全 0；此时保留上一次成功读数，避免界面突然变 "--"
+                val effective = if (info.success) {
+                    lastGood = info
+                    info
+                } else {
+                    lastGood?.copy(stale = true, error = info.error, charging = false) ?: info
+                }
+                battery = effective
+                val brief = "ok=${info.success} stale=${effective.stale} pct=${effective.percent} err=${info.error}"
                 if (brief != lastLogged) {
                     lastLogged = brief
                     appLog("读数: $brief")
@@ -155,11 +163,12 @@ fun main(args: Array<String>) {
                 val t = tray
                 if (t != null) {
                     javax.swing.SwingUtilities.invokeLater {
-                        if (settings.showPercentInTray && info.success && info.percent >= 0) {
+                        if (settings.showPercentInTray && effective.success && effective.percent >= 0) {
                             t.setIcon(
-                                info.percent,
-                                info.charging,
-                                "迈从 A7 V2 Ultra+  ${info.percent}%  ${if (info.charging) "充电中" else "放电中"}",
+                                effective.percent,
+                                effective.charging,
+                                "迈从 A7 V2 Ultra+  ${effective.percent}%" +
+                                    (if (effective.stale) "（休眠，上次读数）" else if (effective.charging) "  充电中" else "  放电中"),
                             )
                         } else {
                             t.setIcon(null, false, "A7 电量助手（设备休眠/未连接）")
@@ -217,6 +226,44 @@ fun main(args: Array<String>) {
                         appLog("窗口已还原（deiconified）")
                     }
                 })
+            }
+
+            // 开发用：Robot 点击底部「鼠标」标签，并在动画中途截图（验证滑动切换）
+            LaunchedEffect(Unit) {
+                if (args.contains("--test-switch")) {
+                    kotlinx.coroutines.delay(3000)
+                    win.isAlwaysOnTop = true
+                    win.toFront()
+                    win.requestFocus()
+                    kotlinx.coroutines.delay(700)
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            val robot = java.awt.Robot()
+                            val x = win.x + win.width / 2      // 中间那项 = 鼠标
+                            val y = win.y + win.height - 44    // 悬浮标签栏位置
+                            robot.mouseMove(x, y)
+                            Thread.sleep(120)
+                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(60)
+                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            // 连拍 6 帧，捕捉滑动过程
+                            for (i in 1..6) {
+                                Thread.sleep(45)
+                                val img = robot.createScreenCapture(win.bounds)
+                                javax.imageio.ImageIO.write(
+                                    img,
+                                    "png",
+                                    java.io.File(
+                                        System.getProperty("java.io.tmpdir"),
+                                        "a7-sw-$i.png",
+                                    ),
+                                )
+                            }
+                        }.onFailure { appLog("切换测试失败: " + it.message) }
+                    }
+                    appLog("测试切换：已点击「鼠标」标签并截图")
+                    win.isAlwaysOnTop = false
+                }
             }
 
             // 开发用：Robot 拖拽标题栏，验证窗口跟随鼠标且不会飞出屏幕

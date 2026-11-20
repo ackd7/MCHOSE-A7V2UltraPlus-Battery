@@ -1,5 +1,12 @@
 package top.ackd7.a7battery.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
@@ -103,6 +111,8 @@ fun App(
             mouseState.refresh()
         }
 
+        LaunchedEffect(page) { top.ackd7.a7battery.appLog("切换到页面 $page") }
+
         Scaffold(
             modifier = Modifier.fillMaxSize(),
             topBar = { titleBar() },
@@ -113,10 +123,39 @@ fun App(
 
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                     Box(modifier = Modifier.widthIn(max = 1040.dp).fillMaxHeight()) {
-                        when (page) {
-                            0 -> BatteryPage(settings, monitor, battery, wide)
-                            1 -> MousePage(settings, mouseState, wide)
-                            else -> SettingsPage(settings, updateInfo, onExitRequested, wide)
+                        // 页面切换：横向滑动 + 弹簧回弹 + 轻微景深缩放（mochi 的 tab 切换手感）
+                        AnimatedContent(
+                            targetState = page,
+                            modifier = Modifier.fillMaxSize(),
+                            transitionSpec = {
+                                val forward = targetState > initialState
+                                val dir = if (forward) 1 else -1
+                                // 软一点、带回弹（低阻尼 + 低刚度），有轻微过冲
+                                val slideSpec = spring<IntOffset>(
+                                    dampingRatio = 0.62f,
+                                    stiffness = Spring.StiffnessLow,
+                                )
+                                // 纯滑动、不做淡入淡出：新页是不透明的，滑入时直接盖住旧页，
+                                // 避免两页 alpha 叠加导致文字互相透出
+                                slideInHorizontally(slideSpec) { full -> dir * full }
+                                    .togetherWith(
+                                        slideOutHorizontally(slideSpec) { full -> -dir * full / 3 },
+                                    )
+                            },
+                            label = "pageSwitch",
+                        ) { p ->
+                            // 每页铺不透明底色：滑动时新页盖住旧页，不会互相透出文字
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(MiuixTheme.colorScheme.background),
+                            ) {
+                                when (p) {
+                                    0 -> BatteryPage(settings, monitor, battery, wide)
+                                    1 -> MousePage(settings, mouseState, wide)
+                                    else -> SettingsPage(settings, updateInfo, onExitRequested, wide)
+                                }
+                            }
                         }
                     }
                 }
@@ -213,12 +252,14 @@ private fun BatteryCard(
             verticalArrangement = if (stretch) Arrangement.Center else Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            val percentColor = when {
+            val baseColor = when {
                 !ok -> c.secondary
                 battery.percent >= 50 -> c.accent
                 battery.percent >= 20 -> Color(0xFFFFC83D)
                 else -> c.danger
             }
+            // 休眠时显示的是上次读数，弱化一点以示区分
+            val percentColor = if (battery.stale) baseColor.copy(alpha = 0.55f) else baseColor
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(
                     text = if (ok) "${battery.percent}" else "--",
@@ -257,6 +298,7 @@ private fun BatteryCard(
                 InfoColumn(
                     label = "状态",
                     value = when {
+                        battery.stale -> "休眠 · 上次读数"
                         !battery.success -> "离线 / 休眠"
                         battery.charging -> "正在充电"
                         else -> "放电中"
@@ -384,7 +426,11 @@ class MouseConfigUiState(
                 loaded = true
                 status = "已读取：当前档位 ${activeDpiIndex + 1}"
             } else {
-                status = "读取失败：${cfg.error}"
+                status = if (cfg.raw.startsWith("00 00")) {
+                    "设备休眠（返回全 0），上方为上次读取的档位；动一下鼠标后点「重新读取配置」"
+                } else {
+                    "读取失败：${cfg.error}"
+                }
             }
         }
     }
