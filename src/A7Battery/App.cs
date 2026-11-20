@@ -1,0 +1,106 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Windows;
+using A7Battery.Services;
+
+namespace A7Battery;
+
+public sealed class App : Application
+{
+    private AppSettings _settings = null!;
+    private BatteryMonitor _monitor = null!;
+    private MainWindow _window = null!;
+    private NativeTrayIcon? _tray;
+
+    internal static void Log(string msg)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "A7Battery");
+            Directory.CreateDirectory(dir);
+            var path = Path.Combine(dir, "app.log");
+            // 超过 256KB 时截断重写，避免长期运行日志无限增长
+            if (File.Exists(path) && new FileInfo(path).Length > 256 * 1024) File.Delete(path);
+            File.AppendAllText(path, $"[{DateTime.Now:HH:mm:ss.fff}] {msg}\n");
+        }
+        catch { }
+    }
+
+    protected override void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        Log("=== 启动 ===");
+
+        try
+        {
+            var args = e.Args;
+            _settings = AppSettings.Load();
+            Log($"设置: StartMinimized={_settings.StartMinimized}, args=[{string.Join(",", args)}]");
+
+            _monitor = new BatteryMonitor();
+            _window = new MainWindow(_settings, _monitor);
+            Log("主窗口已构造");
+
+            // 手动启动永远显示窗口；只有开机自启（--minimized）才缩到托盘。
+            // 这样即使旧版残留了 StartMinimized=true，双击运行也能看到界面。
+            bool minimize = args.Contains("--minimized");
+            if (!minimize)
+            {
+                _window.ShowWindow();
+                Log("窗口已显示");
+            }
+            else
+            {
+                Log("按要求最小化到托盘");
+            }
+
+            // 托盘失败不影响主程序运行
+            try { BuildTray(); Log("托盘已创建"); }
+            catch (Exception tex) { Log("托盘失败: " + tex.Message); }
+
+            _monitor.ReadingChanged += (_, info) =>
+            {
+                Log($"读数: ok={info.Success} pct={info.Percent} err={info.Error}");
+                RefreshTrayIcon();
+            };
+            _monitor.Start(_settings.RefreshSeconds);
+            Log("监控已启动");
+        }
+        catch (Exception ex)
+        {
+            Log("FATAL: " + ex);
+            MessageBox.Show($"启动失败：{ex.Message}", "A7 电量助手", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void BuildTray()
+    {
+        _tray = new NativeTrayIcon();
+        _tray.OnOpen += () => Dispatcher.Invoke(() => _window.ShowWindow());
+        _tray.OnRefresh += () => Dispatcher.Invoke(() => _monitor.Refresh());
+        _tray.OnExit += () => Dispatcher.Invoke(ExitApp);
+        RefreshTrayIcon();
+    }
+
+    public void RefreshTrayIcon()
+    {
+        if (_tray == null) return;
+        var info = _monitor?.Current;
+        bool showPercent = _settings?.ShowPercentInTray ?? true;
+
+        if (showPercent && info != null && info.Success && info.Percent >= 0)
+            _tray.SetIcon(info.Percent, info.Charging,
+                $"迈从 A7 V2 Ultra+  {info.Percent}%  {(info.Charging ? "充电中" : "放电中")}");
+        else
+            _tray.SetIcon(null, false, "A7 电量助手（设备休眠/未连接）");
+    }
+
+    public void ExitApp()
+    {
+        _monitor?.Stop();
+        _tray?.Dispose();
+        Shutdown();
+    }
+}

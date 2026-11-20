@@ -1,0 +1,20 @@
+## 构建输出
+bin/
+obj/
+dist/
+publish/
+*.user
+*.suo
+.vs/
+
+## SDK 下载缓存
+*.zip
+.dotnet/
+
+## Python
+__pycache__/
+*.pyc
+
+## 编辑器
+.vscode/
+.idea/
