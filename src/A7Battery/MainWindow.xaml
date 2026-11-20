@@ -217,12 +217,131 @@
                                       Checked="TrayPercent_Toggled" Unchecked="TrayPercent_Toggled"/>
                         </Grid>
 
+                        <Grid Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="启动时检查更新" FontSize="13" Foreground="#334155"/>
+                                <TextBlock Text="每天首次启动时检查 GitHub 新版本" FontSize="11" Foreground="#9AA5B4" Margin="0,2,0,0"/>
+                            </StackPanel>
+                            <CheckBox x:Name="CheckUpdatesSwitch" Style="{StaticResource Switch}" IsChecked="True" HorizontalAlignment="Right"
+                                      Checked="CheckUpdates_Toggled" Unchecked="CheckUpdates_Toggled"/>
+                        </Grid>
+
                         <Button x:Name="RefreshBtn" Content="立即刷新" Style="{StaticResource PrimaryBtn}" Click="Refresh_Click"/>
                     </StackPanel>
                 </Border>
 
+                <!-- 鼠标设置卡片 -->
+                <Border Style="{StaticResource Card}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,12">
+                            <TextBlock Text="鼠标设置 · DPI / 回报率" FontSize="14" FontWeight="SemiBold" Foreground="#1F2937" VerticalAlignment="Center"/>
+                            <Button x:Name="ReadMouseBtn" Content="读取当前" HorizontalAlignment="Right"
+                                    Style="{StaticResource IntervalBtn}" Click="ReadMouse_Click"/>
+                        </Grid>
+
+                        <TextBlock x:Name="MouseStatusText" Text="点击“读取当前”获取设备现有配置"
+                                   FontSize="11" Foreground="#9AA5B4" Margin="0,0,0,12" TextWrapping="Wrap"/>
+
+                        <!-- DPI 档位 -->
+                        <TextBlock Text="DPI 档位（6 档，点击数字可修改）" FontSize="12" Foreground="#7A8698" Margin="0,0,0,6"/>
+                        <UniformGrid Rows="2" Columns="3" Margin="0,0,0,6">
+                            <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Margin="0,0,5,5" Padding="6,4">
+                                <StackPanel>
+                                    <TextBlock Text="档位 1" FontSize="10" Foreground="#9AA5B4"/>
+                                    <TextBox x:Name="Dpi0" Text="400" FontSize="13" FontWeight="SemiBold" Foreground="#334155"
+                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Margin="0,0,5,5" Padding="6,4">
+                                <StackPanel>
+                                    <TextBlock Text="档位 2" FontSize="10" Foreground="#9AA5B4"/>
+                                    <TextBox x:Name="Dpi1" Text="800" FontSize="13" FontWeight="SemiBold" Foreground="#334155"
+                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Margin="0,0,0,5" Padding="6,4">
+                                <StackPanel>
+                                    <TextBlock Text="档位 3" FontSize="10" Foreground="#9AA5B4"/>
+                                    <TextBox x:Name="Dpi2" Text="1600" FontSize="13" FontWeight="SemiBold" Foreground="#334155"
+                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Margin="0,0,5,0" Padding="6,4">
+                                <StackPanel>
+                                    <TextBlock Text="档位 4" FontSize="10" Foreground="#9AA5B4"/>
+                                    <TextBox x:Name="Dpi3" Text="3200" FontSize="13" FontWeight="SemiBold" Foreground="#334155"
+                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Margin="0,0,5,0" Padding="6,4">
+                                <StackPanel>
+                                    <TextBlock Text="档位 5" FontSize="10" Foreground="#9AA5B4"/>
+                                    <TextBox x:Name="Dpi4" Text="6400" FontSize="13" FontWeight="SemiBold" Foreground="#334155"
+                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Margin="0,0,0,0" Padding="6,4">
+                                <StackPanel>
+                                    <TextBlock Text="档位 6" FontSize="10" Foreground="#9AA5B4"/>
+                                    <TextBox x:Name="Dpi5" Text="26000" FontSize="13" FontWeight="SemiBold" Foreground="#334155"
+                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Grid Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="当前档位" FontSize="12" Foreground="#7A8698" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                <ComboBox x:Name="ActiveDpiCombo" Width="56" FontSize="12" VerticalAlignment="Center"
+                                          SelectedIndex="2">
+                                    <ComboBoxItem Content="1"/>
+                                    <ComboBoxItem Content="2"/>
+                                    <ComboBoxItem Content="3"/>
+                                    <ComboBoxItem Content="4"/>
+                                    <ComboBoxItem Content="5"/>
+                                    <ComboBoxItem Content="6"/>
+                                </ComboBox>
+                            </StackPanel>
+                            <Button x:Name="ApplyDpiBtn" Content="应用 DPI" HorizontalAlignment="Right"
+                                    Style="{StaticResource IntervalBtn}" Click="ApplyDpi_Click"/>
+                        </Grid>
+
+                        <!-- 回报率 -->
+                        <Border Background="#F7F9FC" CornerRadius="8" BorderBrush="#E8ECF1" BorderThickness="1" Padding="10,8" Margin="0,0,0,10">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <TextBlock Text="回报率" FontSize="12" Foreground="#7A8698" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <ComboBox x:Name="RateCombo" Width="96" FontSize="12" VerticalAlignment="Center" SelectedIndex="2">
+                                        <ComboBoxItem Content="125 Hz" Tag="125"/>
+                                        <ComboBoxItem Content="500 Hz" Tag="500"/>
+                                        <ComboBoxItem Content="1000 Hz" Tag="1000"/>
+                                        <ComboBoxItem Content="2000 Hz" Tag="2000"/>
+                                        <ComboBoxItem Content="4000 Hz" Tag="4000"/>
+                                        <ComboBoxItem Content="8000 Hz" Tag="8000"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <Button x:Name="ApplyRateBtn" Content="应用回报率" HorizontalAlignment="Right"
+                                        Style="{StaticResource IntervalBtn}" Click="ApplyRate_Click"/>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Text="设置写入鼠标板载配置，切换连接或重启后依然生效。仅 2.4G / 有线支持高回报率，蓝牙固定 1K。"
+                                   FontSize="10" Foreground="#9AA5B4" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 版本与更新 -->
+                <Grid Margin="0,2,0,0">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="VersionText" Text="v1.0.0" FontSize="11" Foreground="#9AA5B4"/>
+                        <TextBlock Text=" · " FontSize="11" Foreground="#CBD3DD"/>
+                        <TextBlock x:Name="UpdateStatusText" Text="" FontSize="11" Foreground="#9AA5B4" Cursor="Hand"
+                                   MouseLeftButtonUp="UpdateStatus_Click"/>
+                    </StackPanel>
+                </Grid>
+
                 <TextBlock Text="关闭窗口后程序继续在任务栏托盘运行 · 左键托盘图标可再次打开"
-                           FontSize="11" Foreground="#9AA5B4" TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                           FontSize="11" Foreground="#9AA5B4" TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

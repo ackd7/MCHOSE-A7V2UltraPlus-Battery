@@ -11,6 +11,16 @@ namespace A7Battery.Services
         public bool StartMinimized { get; set; } = false;
         public bool ShowPercentInTray { get; set; } = true;
 
+        // 自动更新检查
+        public bool CheckUpdates { get; set; } = true;
+        public DateTime LastUpdateCheck { get; set; } = default;
+        public string SkippedVersion { get; set; } = "";
+
+        // 鼠标 DPI / 回报率（本地记忆，真实值以设备为准）
+        public int[] DpiStages { get; set; } = { 400, 800, 1600, 3200, 6400, 26000 };
+        public int ActiveDpiIndex { get; set; } = 2;
+        public int RateHz { get; set; } = 1000;
+
         private static string SettingsPath
         {
             get
@@ -26,10 +36,24 @@ namespace A7Battery.Services
             try
             {
                 if (File.Exists(SettingsPath))
-                    return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath)) ?? new AppSettings();
+                {
+                    var s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath)) ?? new AppSettings();
+                    s.Normalize();
+                    return s;
+                }
             }
             catch { }
             return new AppSettings();
+        }
+
+        private void Normalize()
+        {
+            if (DpiStages == null || DpiStages.Length != 6)
+                DpiStages = new[] { 400, 800, 1600, 3200, 6400, 26000 };
+            for (int i = 0; i < 6; i++)
+                if (DpiStages[i] < 100 || DpiStages[i] > 30000) DpiStages[i] = 800;
+            ActiveDpiIndex = Math.Clamp(ActiveDpiIndex, 0, 5);
+            if (RateHz < 125) RateHz = 1000;
         }
 
         public void Save()

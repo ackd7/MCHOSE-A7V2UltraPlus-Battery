@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using A7Battery.Services;
 
@@ -8,6 +9,8 @@ namespace A7Battery;
 
 public sealed class App : Application
 {
+    public const string AppVersion = "1.1.0";
+
     private AppSettings _settings = null!;
     private BatteryMonitor _monitor = null!;
     private MainWindow _window = null!;
@@ -67,6 +70,24 @@ public sealed class App : Application
             };
             _monitor.Start(_settings.RefreshSeconds);
             Log("监控已启动");
+
+            // 自动更新检查：开启时每天首次启动检查一次，后台执行不阻塞 UI
+            if (_settings.CheckUpdates && DateTime.Now.Date != _settings.LastUpdateCheck.Date)
+            {
+                _ = Task.Run(async () =>
+                {
+                    var checker = new UpdateChecker();
+                    var info = await checker.CheckAsync(AppVersion);
+                    _settings.LastUpdateCheck = DateTime.Now;
+                    _settings.Save();
+                    Log($"更新检查: available={info.Available} latest={info.LatestVersion} err={info.Error}");
+                    _window?.SetUpdateStatus(info);
+                });
+            }
+            else
+            {
+                _window?.SetUpdateStatus(new UpdateInfo());
+            }
         }
         catch (Exception ex)
         {
