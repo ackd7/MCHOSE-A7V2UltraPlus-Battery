@@ -53,7 +53,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.5"
+const val APP_VERSION = "2.0.6"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -88,7 +88,11 @@ fun main(args: Array<String>) {
         // （只靠 isVisible 布尔值不够：窗口被最小化时 isVisible 仍是 true，置 true 是空操作）
         var showToken by remember { mutableIntStateOf(0) }
 
-        val windowState = rememberWindowState(size = DpSize(420.dp, 720.dp))
+        // 横向窗口；--narrow 为开发用（验证窄屏单列布局）
+        val windowState = rememberWindowState(
+            size = if (args.contains("--narrow")) DpSize(460.dp, 700.dp)
+            else DpSize(880.dp, 560.dp),
+        )
         val menuState = rememberWindowState(size = DpSize(180.dp, 148.dp))
 
         // 所有副作用只做一次
@@ -165,13 +169,15 @@ fun main(args: Array<String>) {
             var isMax by remember { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
+                runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
                 runCatching { applyRoundedCorners(win) }
                 // 去掉 Swing 默认边框，避免无边框窗口右/下缘出现一条细线
                 runCatching { win.rootPane.border = null }
 
                 // 记录窗口状态变化，便于排查「界面消失」类问题
                 win.addWindowStateListener { e ->
-                    appLog("窗口状态变化: ${e.oldState} -> ${e.newState}")
+                    isMax = (e.newState and java.awt.Frame.MAXIMIZED_BOTH) != 0
+                    appLog("窗口状态变化: ${e.oldState} -> ${e.newState}（isMax=$isMax）")
                 }
                 win.addWindowListener(object : java.awt.event.WindowAdapter() {
                     override fun windowIconified(e: java.awt.event.WindowEvent?) {
@@ -182,6 +188,21 @@ fun main(args: Array<String>) {
                         appLog("窗口已还原（deiconified）")
                     }
                 })
+            }
+
+            // 开发用：连续切换最大化 4 次，验证不会出现异常最小化
+            LaunchedEffect(Unit) {
+                if (args.contains("--test-max")) {
+                    kotlinx.coroutines.delay(2500)
+                    repeat(4) { i ->
+                        val maximized =
+                            (win.extendedState and java.awt.Frame.MAXIMIZED_BOTH) != 0
+                        win.extendedState =
+                            if (maximized) java.awt.Frame.NORMAL else java.awt.Frame.MAXIMIZED_BOTH
+                        appLog("测试：第 ${i + 1} 次切换最大化（原状态=${if (maximized) "最大化" else "普通"}）")
+                        kotlinx.coroutines.delay(1200)
+                    }
+                }
             }
 
             // 开发用：模拟「窗口被最小化后从托盘打开」，验证恢复逻辑
@@ -238,14 +259,18 @@ fun main(args: Array<String>) {
                         subtitle = "v$APP_VERSION",
                         isMaximized = isMax,
                         onMinimize = {
-                            // 这是个托盘工具：最小化 = 收起窗口，托盘图标仍在
-                            appLog("点击最小化 → 收起窗口")
-                            isVisible = false
+                            // 真正最小化：任务栏保留按钮；托盘「打开面板」会强制还原
+                            appLog("点击最小化 → 最小化到任务栏")
+                            win.isMinimized = true
                         },
                         onToggleMaximize = {
-                            isMax = !isMax
+                            // 必须以窗口真实状态为依据，不能用自己维护的布尔值（会与系统状态错位）
+                            val maximized =
+                                (win.extendedState and java.awt.Frame.MAXIMIZED_BOTH) != 0
                             win.extendedState =
-                                if (isMax) java.awt.Frame.NORMAL else java.awt.Frame.MAXIMIZED_BOTH
+                                if (maximized) java.awt.Frame.NORMAL
+                                else java.awt.Frame.MAXIMIZED_BOTH
+                            appLog("切换最大化：当前=${if (maximized) "最大化" else "普通"} → ${if (maximized) "普通" else "最大化"}")
                         },
                         onClose = {
                             appLog("点击关闭 → 隐藏窗口")
