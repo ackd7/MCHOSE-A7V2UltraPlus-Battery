@@ -47,6 +47,10 @@ data class AppSettings(
 
     private fun normalize(): AppSettings {
         if (dpiStages.size != 6) dpiStages = intArrayOf(400, 800, 1600, 3200, 6400, 26000)
+        // 挡住历史版本可能存进来的脏数据（例如 11781 / 1026 这类乱值）
+        if (dpiStages.any { it !in 100..42000 || it % 10 != 0 }) {
+            dpiStages = intArrayOf(400, 800, 1600, 3200, 6400, 26000)
+        }
         for (i in dpiStages.indices) {
             if (dpiStages[i] !in 100..42000) dpiStages[i] = 800
         }

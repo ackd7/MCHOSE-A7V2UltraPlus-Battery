@@ -95,7 +95,7 @@ class MouseConfigService {
                 }
                 r.raw = hex(payload, 24)
                 parse(payload, r)
-                if (r.dpiStages[0] > 0) {
+                if (isPlausible(r.dpiStages)) {
                     r.success = true
                     r.error = ""
                     return r
@@ -123,6 +123,16 @@ class MouseConfigService {
     }
 
     private fun clampIndex(v: Int): Int = if (v in 0 until 6) v else -1
+
+    /**
+     * 校验读回的 DPI 是否可信。
+     *
+     * 只判断首档 > 0 会把「半截/错位/休眠中的脏数据」当成功（实测出现过
+     * 11781 / 1026 / 23305 / 24064 / 0 / 0 这种乱值并被存进设置）。
+     * 这里要求六档全部落在 100..42000 且都是 10 的整数倍，不符合就当作读取失败重试。
+     */
+    private fun isPlausible(stages: IntArray): Boolean =
+        stages.size == 6 && stages.all { it in 100..42000 && it % 10 == 0 }
 
     /** 写入 6 个 DPI 档位并设置当前激活档。 */
     fun setDpi(stages: IntArray, activeIndex: Int): Pair<Boolean, String> {

@@ -394,6 +394,9 @@ private fun formatTime(epochMs: Long): String = runCatching {
 
 // ---------------- 鼠标页 ----------------
 
+/** DPI 预设档位（自定义时可手填任意 100–42000 的值）。 */
+private val DpiPresets = listOf(400, 800, 1200, 1600, 2400, 3200, 6400, 12000, 26000, 32000, 42000)
+
 /**
  * 鼠标配置的 UI 状态（提升到 App 层，切页/重开不丢失）。
  *
@@ -412,11 +415,20 @@ class MouseConfigUiState(
     var rateIndex by mutableIntStateOf(rateIndexFromHz(settings.rateHz))
     var status by mutableStateOf("")
 
+    /** 「自定义 DPI」是否处于展开状态。 */
+    var customDpi by mutableStateOf(false)
+
     var busy by mutableStateOf(false)
         private set
 
     var loaded by mutableStateOf(false)
         private set
+
+    fun stageValue(index: Int): Int = dpiText[index].trim().toIntOrNull() ?: 0
+
+    fun setStageValue(index: Int, value: Int) {
+        dpiText[index] = value.coerceIn(100, 42000).toString()
+    }
 
     fun refresh() {
         if (busy) return
@@ -432,6 +444,7 @@ class MouseConfigUiState(
                 settings.activeDpiIndex = activeDpiIndex
                 settings.save()
                 loaded = true
+                customDpi = false
                 status = "已读取：当前档位 ${activeDpiIndex + 1}"
             } else {
                 status = if (cfg.raw.startsWith("00 00")) {
@@ -498,6 +511,13 @@ private fun rememberMouseConfigUiState(settings: AppSettings): MouseConfigUiStat
 
 @Composable
 private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Boolean) {
+    val c = rememberMochiColors()
+
+    val stageSummary = (0 until 6).joinToString(" · ") { i ->
+        val mark = if (i == state.activeDpiIndex) "*" else ""
+        "$mark${i + 1} ${state.dpiText[i]}"
+    }
+
     val deviceSection: @Composable () -> Unit = {
         MochiSection(header = "设备配置", footer = state.status.ifBlank { null }) {
             MochiRow(
@@ -509,21 +529,84 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
             )
         }
     }
+
     val dpiSection: @Composable () -> Unit = {
-        DpiSection(
-            dpiText = state.dpiText,
-            activeDpiIndex = state.activeDpiIndex,
-            onSelect = { state.activeDpiIndex = it },
-            onWrite = { state.writeDpi() },
-            wide = wide,
-        )
+        MochiSection(
+            header = "DPI",
+            footer = "各档：$stageSummary（* 当前档）",
+        ) {
+            // 当前档位
+            MochiDropdownRow(
+                title = "当前档位",
+                options = (1..6).map { "档位 $it" },
+                selectedIndex = state.activeDpiIndex,
+                onSelect = { state.activeDpiIndex = it },
+            )
+
+            // DPI 数值：预设 + 自定义
+            val current = state.stageValue(state.activeDpiIndex)
+            val presetIndex = DpiPresets.indexOf(current)
+            val customSelected = presetIndex < 0 || state.customDpi
+            MochiDropdownRow(
+                title = "DPI 数值",
+                options = DpiPresets.map { "$it" } + "自定义…",
+                selectedIndex = if (customSelected) DpiPresets.size else presetIndex,
+                divider = !customSelected,
+                onSelect = { idx ->
+                    if (idx < DpiPresets.size) {
+                        state.customDpi = false
+                        state.setStageValue(state.activeDpiIndex, DpiPresets[idx])
+                    } else {
+                        state.customDpi = true
+                    }
+                },
+            )
+
+            if (customSelected) {
+                MochiRow(
+                    title = "自定义数值",
+                    subtitle = "100–42000，直接输入后写入",
+                    divider = false,
+                    trailing = {
+                        BasicTextField(
+                            value = state.dpiText[state.activeDpiIndex],
+                            onValueChange = { input ->
+                                state.dpiText[state.activeDpiIndex] =
+                                    input.filter { it.isDigit() }.take(5)
+                            },
+                            singleLine = true,
+                            textStyle = TextStyle(
+                                fontSize = 14.sp,
+                                color = c.accent,
+                                textAlign = TextAlign.End,
+                            ),
+                            cursorBrush = SolidColor(c.accent),
+                            modifier = Modifier.width(72.dp),
+                        )
+                    },
+                )
+            }
+
+            MochiButtonRow(
+                text = "写入 DPI（档位 ${state.activeDpiIndex + 1}）",
+                onClick = { state.writeDpi() },
+            )
+        }
     }
+
     val rateSection: @Composable () -> Unit = {
-        RateSection(
-            rateIndex = state.rateIndex,
-            onRateChange = { state.rateIndex = it },
-            onWrite = { state.writeRate() },
-        )
+        MochiSection(
+            header = "回报率",
+            footer = "此型号的配置报告不含回报率字段（回读恒为 125 Hz），这里显示本地记录值；写入后以实际手感为准。",
+        ) {
+            MochiDropdownRow(
+                title = "回报率",
+                options = MouseConfigService.RateHz.map { "$it Hz" },
+                selectedIndex = state.rateIndex,
+                onSelect = { state.rateIndex = it },
+            )
+            MochiButtonRow(text = "写入回报率", onClick = { state.writeRate() })
+        }
     }
 
     if (wide) {
@@ -544,7 +627,7 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
             }
             Column(
                 modifier = Modifier
-                    .weight(1.15f)
+                    .weight(1f)
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState()),
             ) {
@@ -565,83 +648,9 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
     }
 }
 
-@Composable
-private fun DpiSection(
-    dpiText: SnapshotStateList<String>,
-    activeDpiIndex: Int,
-    onSelect: (Int) -> Unit,
-    onWrite: () -> Unit,
-    wide: Boolean = false,
-) {
-    val c = rememberMochiColors()
-    // 宽屏时卡片更靠下，footer 会落进底部遮罩里 → 把提示并进标题
-    val header = if (wide) "DPI 档位（点档位名设为当前档）" else "DPI 档位"
-    val footer = if (wide) null else "点档位名设为当前档，数值可直接编辑"
-    MochiSection(header = header, footer = footer) {
-        for (i in 0 until 6) {
-            val active = i == activeDpiIndex
-            MochiRow(
-                title = "档位 ${i + 1}",
-                divider = i != 5,
-                accent = active,
-                onClick = { onSelect(i) },
-                trailing = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        BasicTextField(
-                            value = dpiText[i],
-                            onValueChange = { input ->
-                                dpiText[i] = input.filter { it.isDigit() }.take(5)
-                            },
-                            singleLine = true,
-                            textStyle = TextStyle(
-                                fontSize = 14.sp,
-                                color = if (active) c.accent else c.secondary,
-                                textAlign = TextAlign.End,
-                            ),
-                            cursorBrush = SolidColor(c.accent),
-                            modifier = Modifier.width(64.dp),
-                        )
-                        if (active) {
-                            Spacer(Modifier.width(6.dp))
-                            Check(color = c.accent)
-                        }
-                    }
-                },
-            )
-        }
-        MochiButtonRow(text = "写入 DPI（档位 ${activeDpiIndex + 1}）", onClick = onWrite)
-    }
-}
-
-@Composable
-private fun RateSection(rateIndex: Int, onRateChange: (Int) -> Unit, onWrite: () -> Unit) {
-    val c = rememberMochiColors()
-    MochiSection(
-        header = "回报率",
-        footer = "此型号的配置报告不含回报率字段（回读恒为 125 Hz），这里显示本地记录值；写入后以实际手感为准。",
-    ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            var sliderValue by remember(rateIndex) { mutableFloatStateOf(rateIndex.toFloat()) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text("回报率", fontSize = 15.sp, color = c.text)
-                Text("${MouseConfigService.RateHz[rateIndex]} Hz", fontSize = 15.sp, color = c.accent)
-            }
-            Spacer(Modifier.height(6.dp))
-            Slider(
-                value = sliderValue,
-                onValueChange = { sliderValue = it },
-                valueRange = 0f..5f,
-                onValueChangeFinished = {
-                    onRateChange(sliderValue.toInt().coerceIn(0, 5))
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        MochiButtonRow(text = "写入回报率", onClick = onWrite)
-    }
+private fun rateIndexFromHz(hz: Int): Int {
+    val idx = MouseConfigService.RateHz.indexOf(hz)
+    return if (idx >= 0) idx else 2
 }
 
 // ---------------- 设置页 ----------------
@@ -771,9 +780,4 @@ private fun SettingsPage(
             item { exitSection() }
         }
     }
-}
-
-private fun rateIndexFromHz(hz: Int): Int {
-    val idx = MouseConfigService.RateHz.indexOf(hz)
-    return if (idx >= 0) idx else 2
 }
