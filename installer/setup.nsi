@@ -2,7 +2,7 @@
 ; 构建（在仓库根目录）：
 ;   makensis /DAPP_VERSION=2.0.5 installer/setup.nsi
 ; 说明：
-;   - 默认按用户安装到 %LOCALAPPDATA%\Programs\A7Battery，无需管理员权限
+;   - 默认按用户安装到 %LOCALAPPDATA%\Programs\MCHOSE-A7V2UltraPlus-Battery，无需管理员权限
 ;   - 安装向导里可以勾选「创建桌面快捷方式」和「开机自动启动」
 ;   - 写入 HKCU 卸载信息，可在「设置 → 应用」中正常卸载
 
@@ -16,11 +16,11 @@ Unicode true
 !endif
 
 !define APP_NAME      "MCHOSE A7 V2 Ultra+ Battery"
-!define APP_EXE       "A7Battery.exe"
+!define APP_EXE       "MCHOSE-A7V2UltraPlus-Battery.exe"
 !define APP_PUBLISHER "ackd7"
-!define APP_REGKEY    "Software\Microsoft\Windows\CurrentVersion\Uninstall\A7Battery"
+!define APP_REGKEY    "Software\Microsoft\Windows\CurrentVersion\Uninstall\MCHOSE-A7V2UltraPlus-Battery"
 !ifndef SOURCE_DIR
-  !define SOURCE_DIR "..\app\build\compose\binaries\main\app\A7Battery"
+  !define SOURCE_DIR "..\app\build\compose\binaries\main\app\MCHOSE-A7V2UltraPlus-Battery"
 !endif
 !ifndef OUT_DIR
   !define OUT_DIR "..\dist"
@@ -28,8 +28,8 @@ Unicode true
 
 Name "${APP_NAME}"
 OutFile "${OUT_DIR}\MCHOSE-A7V2UltraPlus-Battery-Setup-${APP_VERSION}.exe"
-InstallDir "$LOCALAPPDATA\Programs\A7Battery"
-InstallDirRegKey HKCU "Software\A7Battery" "InstallDir"
+InstallDir "$LOCALAPPDATA\Programs\MCHOSE-A7V2UltraPlus-Battery"
+InstallDirRegKey HKCU "Software\MCHOSE-A7V2UltraPlus-Battery" "InstallDir"
 RequestExecutionLevel user
 SetCompressor /SOLID lzma
 ShowInstDetails show
@@ -46,7 +46,7 @@ VIAddVersionKey "CompanyName" "${APP_PUBLISHER}"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\${APP_EXE}"
 !define MUI_FINISHPAGE_RUN_TEXT "立即启动 ${APP_NAME}"
 !define MUI_FINISHPAGE_LINK "项目主页（GitHub）"
-!define MUI_FINISHPAGE_LINK_LOCATION "https://github.com/ackd7/A7Battery"
+!define MUI_FINISHPAGE_LINK_LOCATION "https://github.com/ackd7/MCHOSE-A7V2UltraPlus-Battery"
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_DIRECTORY
@@ -71,18 +71,22 @@ Section "主程序（必需）" SecMain
   SetOutPath "$INSTDIR"
   File /r "${SOURCE_DIR}\*.*"
 
-  WriteRegStr HKCU "Software\A7Battery" "InstallDir" "$INSTDIR"
+  WriteRegStr HKCU "Software\MCHOSE-A7V2UltraPlus-Battery" "InstallDir" "$INSTDIR"
 
   ; 开始菜单
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\卸载 ${APP_NAME}.lnk" "$INSTDIR\Uninstall.exe"
 
-  ; 旧版本（A7 电量助手）遗留的快捷方式，升级时一并清掉
+  ; 旧版本遗留的快捷方式、注册表项与安装目录，升级时一并清掉
   Delete "$DESKTOP\A7 电量助手.lnk"
   Delete "$SMPROGRAMS\A7 电量助手\A7 电量助手.lnk"
   Delete "$SMPROGRAMS\A7 电量助手\卸载 A7 电量助手.lnk"
   RMDir "$SMPROGRAMS\A7 电量助手"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "A7Battery"
+  DeleteRegKey   HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\A7Battery"
+  DeleteRegKey   HKCU "Software\A7Battery"
+  RMDir /r "$LOCALAPPDATA\Programs\A7Battery"
 
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
@@ -106,7 +110,7 @@ Section "创建桌面快捷方式" SecDesktop
 SectionEnd
 
 Section "开机自动启动" SecStartup
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "A7Battery" \
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "MCHOSE-A7V2UltraPlus-Battery" \
     '"$INSTDIR\${APP_EXE}" --minimized'
 SectionEnd
 
@@ -124,14 +128,15 @@ Section "Uninstall"
 
   Delete "$DESKTOP\${APP_NAME}.lnk"
   Delete "$DESKTOP\A7 电量助手.lnk"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "A7Battery"
   Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
   Delete "$SMPROGRAMS\${APP_NAME}\卸载 ${APP_NAME}.lnk"
   RMDir  "$SMPROGRAMS\${APP_NAME}"
 
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "A7Battery"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "MCHOSE-A7V2UltraPlus-Battery"
   DeleteRegKey   HKCU "${APP_REGKEY}"
-  DeleteRegKey   HKCU "Software\A7Battery"
+  DeleteRegKey   HKCU "Software\MCHOSE-A7V2UltraPlus-Battery"
 
-  ; 保留用户配置（%LOCALAPPDATA%\A7Battery\settings.json），只删程序目录
+  ; 保留用户配置（%LOCALAPPDATA%\MCHOSE-A7V2UltraPlus-Battery\settings.json），只删程序目录
   RMDir /r "$INSTDIR"
 SectionEnd

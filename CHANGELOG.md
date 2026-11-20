@@ -3,6 +3,22 @@
 本文件用于生成 GitHub Release 的「更新内容」段落。发布新版本时，在顶部新增一节，
 标题格式为 `## vX.Y.Z`，CI 会按版本号自动截取对应小节。
 
+## v3.2.0
+
+### 变更
+- **内部标识统一改为新名字**（此前只改了显示名，exe / 配置目录 / 注册表项仍叫 A7Battery）：
+  - 可执行文件：`MCHOSE-A7V2UltraPlus-Battery.exe`
+  - 配置与日志目录：`%LOCALAPPDATA%\MCHOSE-A7V2UltraPlus-Battery`
+  - 安装目录：`%LOCALAPPDATA%\Programs\MCHOSE-A7V2UltraPlus-Battery`
+  - 开机自启 / 卸载注册表项名同步更名
+  - MSI 文件名变为 `MCHOSE-A7V2UltraPlus-Battery-<版本>.msi`
+
+### 升级与迁移
+- **首次启动自动迁移旧配置**：旧目录 `%LOCALAPPDATA%\A7Battery\settings.json` 会复制到新目录，
+  外观、低电量提醒阈值、DPI 等设置不丢（旧文件保留作备份）。
+- **开机自启自动迁移**：写入自启时同时清理旧的 `A7Battery` 注册表值，避免重复启动。
+- 安装程序在升级/卸载时清理旧版本留下的快捷方式、注册表项与安装目录。
+
 ## v3.1.3
 
 ### 变更

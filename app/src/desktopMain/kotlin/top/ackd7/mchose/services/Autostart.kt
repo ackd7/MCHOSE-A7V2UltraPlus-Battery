@@ -9,7 +9,9 @@ import com.sun.jna.platform.win32.WinReg
 object Autostart {
 
     private const val RUN_KEY = "Software\\Microsoft\\Windows\\CurrentVersion\\Run"
-    private const val APP_NAME = "A7Battery"
+    private const val APP_NAME = top.ackd7.mchose.APP_ID
+    /** 旧版本使用的注册表值名，写入/删除时顺带清掉。 */
+    private const val LEGACY_NAME = "A7Battery"
 
     fun isEnabled(): Boolean {
         return try {
@@ -31,6 +33,10 @@ object Autostart {
                 }
             } else {
                 Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, APP_NAME)
+            }
+            // 顺带清掉旧版本写入的值，避免重复自启
+            runCatching {
+                Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, LEGACY_NAME)
             }
         } catch (_: Exception) {
         }

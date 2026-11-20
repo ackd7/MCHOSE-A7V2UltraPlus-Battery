@@ -57,7 +57,7 @@ compose.desktop {
         nativeDistributions {
             // MSI 作为备用安装包；主推 dist 里的 NSIS Setup（中文向导，可选桌面快捷方式）
             targetFormats(TargetFormat.Msi)
-            packageName = "A7Battery"
+            packageName = "MCHOSE-A7V2UltraPlus-Battery"
             packageVersion = appVersion
             // 显示名称与版本信息（exe 属性里的"产品名称/公司"）
             description = "MCHOSE A7 V2 Ultra+ Battery"

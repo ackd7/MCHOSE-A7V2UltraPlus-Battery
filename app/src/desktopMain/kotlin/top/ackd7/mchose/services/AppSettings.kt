@@ -33,9 +33,18 @@ data class AppSettings(
         private fun settingsPath(): File {
             val base = System.getenv("LOCALAPPDATA")
                 ?: System.getProperty("user.home")
-            val dir = File(base, "A7Battery")
+            val dir = File(base, top.ackd7.mchose.APP_ID)
             dir.mkdirs()
-            return File(dir, "settings.json")
+            val target = File(dir, "settings.json")
+            // 旧版本配置目录（%LOCALAPPDATA%\A7Battery）迁移，避免用户设置丢失
+            val legacy = File(File(base, "A7Battery"), "settings.json")
+            if (!target.exists() && legacy.exists()) {
+                runCatching {
+                    legacy.copyTo(target, overwrite = false)
+                    top.ackd7.mchose.appLog("已迁移旧配置: ${legacy.absolutePath} -> ${target.absolutePath}")
+                }
+            }
+            return target
         }
 
         fun load(): AppSettings {

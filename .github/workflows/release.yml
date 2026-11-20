@@ -116,7 +116,7 @@ jobs:
           $body += '## 下载'
           $body += ''
           $body += ('- **推荐**：`MCHOSE-A7V2UltraPlus-Battery-Setup-{0}.exe` —— 中文安装向导，可勾选「创建桌面快捷方式」「开机自动启动」，无需管理员权限' -f $ver)
-          $body += ('- **备用**：`A7Battery-{0}.msi` —— Windows Installer（英文向导）' -f $ver)
+          $body += ('- **备用**：`MCHOSE-A7V2UltraPlus-Battery-{0}.msi` —— Windows Installer（英文向导）' -f $ver)
           $body += ''
           $body += '## 说明'
           $body += ''

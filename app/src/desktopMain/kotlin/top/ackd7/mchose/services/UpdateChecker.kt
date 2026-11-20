@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.net.HttpURLConnection
+import top.ackd7.mchose.APP_ID
 import java.net.URL
 
 /**
@@ -32,7 +33,7 @@ class UpdateChecker {
             conn.requestMethod = "GET"
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
-            conn.setRequestProperty("User-Agent", "A7Battery-Updater")
+            conn.setRequestProperty("User-Agent", "$APP_ID-Updater")
             conn.setRequestProperty("Accept", "application/vnd.github+json")
             val text = conn.inputStream.bufferedReader().use { it.readText() }
 

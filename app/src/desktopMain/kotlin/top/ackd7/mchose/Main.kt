@@ -55,21 +55,24 @@ import top.ackd7.mchose.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.1.3"
+const val APP_VERSION = "3.2.0"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
+
+/** 内部标识：exe / 配置目录 / 注册表项统一使用（不含空格与加号）。 */
+const val APP_ID = "MCHOSE-A7V2UltraPlus-Battery"
 
 /** 启动参数（供 UI 层读取开发开关）。 */
 private var startupArgs: Array<String> = emptyArray()
 
 internal fun appArgsContains(arg: String): Boolean = startupArgs.contains(arg)
 
-/** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
+/** 轻量日志：写入 %LOCALAPPDATA%\APP_ID\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
     runCatching {
         val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
-        val dir = java.io.File(base, "A7Battery").apply { mkdirs() }
+        val dir = java.io.File(base, APP_ID).apply { mkdirs() }
         java.io.File(dir, "app.log").appendText("[${java.time.LocalDateTime.now()}] $msg\n")
     }
 }

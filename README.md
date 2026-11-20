@@ -73,7 +73,7 @@ DPI / 回报率（同一协议族的厂商命令）：
 - **安装向导（推荐）**：`MCHOSE-A7V2UltraPlus-Battery-Setup-<版本>.exe`
   中文向导，按当前用户安装（无需管理员）。安装时可勾选 **创建桌面快捷方式**、**开机自动启动**；
   卸载在「设置 → 应用」里完成，用户配置会保留。
-- **MSI 安装包**：`A7Battery-<版本>.msi`
+- **MSI 安装包**：`MCHOSE-A7V2UltraPlus-Battery-<版本>.msi`
   系统级 Windows Installer（英文向导），自动创建开始菜单与桌面快捷方式。
 
 运行说明：
