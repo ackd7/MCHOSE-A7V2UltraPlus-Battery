@@ -14,7 +14,6 @@ import top.ackd7.a7battery.services.NativeTrayIcon
 import top.ackd7.a7battery.services.UpdateChecker
 import top.ackd7.a7battery.services.UpdateInfo
 import top.ackd7.a7battery.ui.App
-import java.awt.Window
 
 const val APP_VERSION = "2.0.0"
 
@@ -27,7 +26,7 @@ fun main(args: Array<String>) {
         var tray: NativeTrayIcon? = null
         var updateInfo by mutableStateOf(UpdateInfo())
         // 保存主窗口引用，供托盘回调重新显示窗口
-        var mainWindow: Window? = null
+        var mainWindow: java.awt.Window? = null
 
         val windowState = rememberWindowState(size = DpSize(420.dp, 720.dp))
 

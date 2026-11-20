@@ -7,6 +7,11 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
+// 版本号：优先取 -Pversion=xxx，其次取环境变量 APP_VERSION，默认 2.0.0
+val appVersion: String = (project.findProperty("version") as String?)
+    ?: System.getenv("APP_VERSION")
+    ?: "2.0.0"
+
 kotlin {
     jvm("desktop")
 
@@ -19,7 +24,6 @@ kotlin {
             implementation(compose.material3)
             implementation(compose.ui)
             implementation(compose.components.resources)
-            implementation(compose.components.uiToolingPreview)
 
             implementation(libs.kotlinx.serialization.json)
 
@@ -33,20 +37,16 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.jna)
             implementation(libs.jna.platform)
-            // miuix-window 仅 desktop 平台提供
-            implementation(libs.miuix.window)
         }
     }
 }
 
-// 版本号：优先取 -Pversion=xxx，其次取环境变量 APP_VERSION，默认 2.0.0
-val appVersion: String = (project.findProperty("version") as String?)
-    ?: System.getenv("APP_VERSION")
-    ?: "2.0.0"
-
 compose.desktop {
     application {
         mainClass = "top.ackd7.a7battery.MainKt"
+
+        // JNA 需要 native access 权限（JDK 17+）
+        jvmArgs += listOf("--enable-native-access=ALL-UNNAMED")
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
@@ -63,8 +63,4 @@ compose.desktop {
             }
         }
     }
-}
-
-compose {
-    // 桌面运行时使用 Skiko 渲染，默认即可
 }
