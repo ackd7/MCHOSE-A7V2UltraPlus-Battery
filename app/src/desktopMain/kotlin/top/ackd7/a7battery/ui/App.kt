@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,7 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CoroutineScope
@@ -40,32 +45,33 @@ import top.ackd7.a7battery.services.BatteryMonitor
 import top.ackd7.a7battery.services.ConnectionMode
 import top.ackd7.a7battery.services.MouseConfigService
 import top.ackd7.a7battery.services.UpdateInfo
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
-import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
-import top.yukonga.miuix.kmp.basic.Icon
+import top.ackd7.a7battery.ui.mochi.Check
+import top.ackd7.a7battery.ui.mochi.MochiButtonRow
+import top.ackd7.a7battery.ui.mochi.MochiDropdownRow
+import top.ackd7.a7battery.ui.mochi.MochiRow
+import top.ackd7.a7battery.ui.mochi.MochiSection
+import top.ackd7.a7battery.ui.mochi.MochiSwitch
+import top.ackd7.a7battery.ui.mochi.MochiTab
+import top.ackd7.a7battery.ui.mochi.MochiTabBar
+import top.ackd7.a7battery.ui.mochi.rememberMochiColors
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
-import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Home
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Tune
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 内容区底部留白，避免被悬浮导航栏挡住。 */
-private val BottomInset = 104.dp
+/** 内容区底部留白，避免被悬浮标签栏挡住。 */
+private val BottomInset = 152.dp
 
-/**
- * 主界面：三页（电量 / 鼠标 / 设置），底部悬浮导航栏切换（miuix 风格）。
- * 标题栏由外部传入，便于把窗口的最小化 / 最大化 / 关闭按钮做进 UI。
- */
+private val Tabs = listOf(
+    MochiTab("电量", MiuixIcons.Home),
+    MochiTab("鼠标", MiuixIcons.Tune),
+    MochiTab("设置", MiuixIcons.Settings),
+)
+
 @Composable
 fun App(
     settings: AppSettings,
@@ -74,11 +80,12 @@ fun App(
     updateInfo: UpdateInfo,
     titleBar: @Composable () -> Unit,
     onExitRequested: () -> Unit,
+    initialPage: Int = 0,
 ) {
     AppTheme {
-        var page by remember { mutableIntStateOf(0) }
+        var page by remember { mutableIntStateOf(initialPage.coerceIn(0, 2)) }
 
-        LaunchedEffect(Unit) { top.ackd7.a7battery.appLog("UI 已组合（悬浮导航 + 三页）") }
+        LaunchedEffect(Unit) { top.ackd7.a7battery.appLog("UI 已组合（mochi 列表 + 悬浮标签栏）") }
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -92,28 +99,27 @@ fun App(
                     else -> SettingsPage(settings, updateInfo, onExitRequested)
                 }
 
-                FloatingNavigationBar(
-                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-                ) {
-                    FloatingNavigationBarItem(
-                        selected = page == 0,
-                        onClick = { page = 0 },
-                        icon = MiuixIcons.Home,
-                        label = "电量",
-                    )
-                    FloatingNavigationBarItem(
-                        selected = page == 1,
-                        onClick = { page = 1 },
-                        icon = MiuixIcons.Tune,
-                        label = "鼠标",
-                    )
-                    FloatingNavigationBarItem(
-                        selected = page == 2,
-                        onClick = { page = 2 },
-                        icon = MiuixIcons.Settings,
-                        label = "设置",
-                    )
-                }
+                // 底部渐变遮罩：内容滚到悬浮栏下方时淡出，不露出半截控件
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                0f to Color.Transparent,
+                                0.5f to MiuixTheme.colorScheme.background.copy(alpha = 0.92f),
+                                1f to MiuixTheme.colorScheme.background,
+                            ),
+                        ),
+                )
+
+                MochiTabBar(
+                    tabs = Tabs,
+                    selectedIndex = page,
+                    onSelect = { page = it },
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
+                )
             }
         }
     }
@@ -127,26 +133,32 @@ private fun BatteryPage(
     monitor: BatteryMonitor,
     battery: BatteryInfo,
 ) {
+    val c = rememberMochiColors()
     var refreshSeconds by remember { mutableIntStateOf(settings.refreshSeconds) }
-    val primary = MiuixTheme.colorScheme.primary
+    val ok = battery.success && battery.percent >= 0
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = BottomInset),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = BottomInset),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         item {
-            Spacer(Modifier.height(8.dp))
-            Card(modifier = Modifier.fillMaxWidth()) {
+            // 信息卡：电量数字 + 进度条 + 三列状态
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(c.card, RoundedCornerShape(20.dp))
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+            ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    val ok = battery.success && battery.percent >= 0
                     val percentColor = when {
-                        !ok -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        battery.percent >= 50 -> primary
+                        !ok -> c.secondary
+                        battery.percent >= 50 -> c.accent
                         battery.percent >= 20 -> Color(0xFFFFC83D)
-                        else -> Color(0xFFFF5C5C)
+                        else -> c.danger
                     }
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
@@ -157,19 +169,23 @@ private fun BatteryPage(
                         Text(
                             text = "%",
                             fontSize = 18.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            color = c.secondary,
                             modifier = Modifier.padding(bottom = 14.dp, start = 2.dp),
                         )
                     }
 
                     Spacer(Modifier.height(16.dp))
                     Box(
-                        modifier = Modifier.fillMaxWidth().height(8.dp)
-                            .background(MiuixTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(4.dp)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .background(c.fill, RoundedCornerShape(4.dp)),
                     ) {
                         val frac = if (ok && battery.percent > 0) battery.percent / 100f else 0f
                         Box(
-                            modifier = Modifier.fillMaxWidth(frac).height(8.dp)
+                            modifier = Modifier
+                                .fillMaxWidth(frac)
+                                .height(8.dp)
                                 .background(percentColor, RoundedCornerShape(4.dp)),
                         )
                     }
@@ -196,67 +212,69 @@ private fun BatteryPage(
                                 else -> "未知"
                             },
                         )
-                        InfoColumn(
-                            label = "设备",
-                            value = battery.deviceName.ifBlank { "--" },
-                        )
-                    }
-
-                    if (!battery.success && battery.error.isNotBlank()) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = battery.error,
-                            fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        )
+                        InfoColumn(label = "设备", value = battery.deviceName.ifBlank { "--" })
                     }
                 }
             }
-            Spacer(Modifier.height(18.dp))
         }
 
         item {
-            SmallTitle("刷新")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    WindowDropdownPreference(
-                        items = listOf("15 秒", "30 秒", "90 秒"),
-                        selectedIndex = when (refreshSeconds) {
-                            15 -> 0
-                            90 -> 2
-                            else -> 1
-                        },
-                        title = "自动刷新间隔",
-                        onSelectedIndexChange = { idx ->
-                            refreshSeconds = when (idx) {
-                                0 -> 15
-                                2 -> 90
-                                else -> 30
-                            }
-                            settings.refreshSeconds = refreshSeconds
-                            settings.save()
-                            monitor.setInterval(refreshSeconds)
-                        },
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    TextButton(
-                        text = "立即刷新",
-                        onClick = { monitor.refresh() },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                }
+            MochiSection(
+                header = "刷新",
+                footer = if (!battery.success && battery.error.isNotBlank()) battery.error else null,
+            ) {
+                MochiDropdownRow(
+                    title = "自动刷新间隔",
+                    options = listOf("15 秒", "30 秒", "90 秒"),
+                    selectedIndex = when (refreshSeconds) {
+                        15 -> 0
+                        90 -> 2
+                        else -> 1
+                    },
+                    onSelect = { idx ->
+                        refreshSeconds = when (idx) {
+                            0 -> 15
+                            2 -> 90
+                            else -> 30
+                        }
+                        settings.refreshSeconds = refreshSeconds
+                        settings.save()
+                        monitor.setInterval(refreshSeconds)
+                    },
+                )
+                MochiButtonRow(text = "立即刷新", onClick = { monitor.refresh() })
+            }
+        }
+
+        item {
+            MochiSection(header = "详情") {
+                MochiRow(
+                    title = "上次更新",
+                    value = if (battery.updatedAt > 0) formatTime(battery.updatedAt) else "--",
+                )
+                MochiRow(
+                    title = "设备编号",
+                    value = if (battery.vendorId.isNotBlank()) "${battery.vendorId}:${battery.productId}" else "--",
+                    divider = false,
+                )
             }
         }
     }
 }
 
+private fun formatTime(epochMs: Long): String = runCatching {
+    java.time.Instant.ofEpochMilli(epochMs)
+        .atZone(java.time.ZoneId.systemDefault())
+        .format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"))
+}.getOrDefault("--")
+
 @Composable
 private fun InfoColumn(label: String, value: String) {
+    val c = rememberMochiColors()
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, fontSize = 12.sp, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+        Text(label, fontSize = 12.sp, color = c.secondary)
         Spacer(Modifier.height(4.dp))
-        Text(value, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface)
+        Text(value, fontSize = 14.sp, color = c.text)
     }
 }
 
@@ -264,6 +282,7 @@ private fun InfoColumn(label: String, value: String) {
 
 @Composable
 private fun MousePage(settings: AppSettings) {
+    val c = rememberMochiColors()
     val mouse = remember { MouseConfigService() }
     val dpiText = remember {
         mutableStateListOf(*settings.dpiStages.map { it.toString() }.toTypedArray())
@@ -292,7 +311,7 @@ private fun MousePage(settings: AppSettings) {
                         else -> -1
                     }
                     if (hz > 0) rateIndex = rateIndexFromHz(hz)
-                    status = "已读取：当前档位 ${activeDpiIndex + 1}"
+                    status = "已读取：当前档位 ${activeDpiIndex + 1} · ${MouseConfigService.RateHz[rateIndex]} Hz"
                 } else {
                     status = "读取失败：${cfg.error}"
                 }
@@ -350,79 +369,83 @@ private fun MousePage(settings: AppSettings) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = BottomInset),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = BottomInset),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         item {
-            Spacer(Modifier.height(8.dp))
-            SmallTitle("设备配置")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    ArrowPreference(
-                        title = "读取当前配置",
-                        summary = "从鼠标回读 DPI 与回报率",
-                        onClick = { readConfig() },
+            MochiSection(
+                header = "设备配置",
+                footer = status.ifBlank { null },
+            ) {
+                MochiRow(
+                    title = "读取当前配置",
+                    subtitle = "从鼠标回读 DPI 与回报率",
+                    chevron = true,
+                    divider = false,
+                    onClick = { readConfig() },
+                )
+            }
+        }
+
+        item {
+            MochiSection(
+                header = "DPI 档位",
+                footer = "点档位名设为当前档，数值可直接编辑",
+            ) {
+                for (i in 0 until 6) {
+                    val active = i == activeDpiIndex
+                    MochiRow(
+                        title = "档位 ${i + 1}",
+                        divider = i != 5,
+                        accent = active,
+                        onClick = { activeDpiIndex = i },
+                        trailing = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                BasicTextField(
+                                    value = dpiText[i],
+                                    onValueChange = { input ->
+                                        dpiText[i] = input.filter { it.isDigit() }.take(5)
+                                    },
+                                    singleLine = true,
+                                    textStyle = TextStyle(
+                                        fontSize = 14.sp,
+                                        color = if (active) c.accent else c.secondary,
+                                        textAlign = TextAlign.End,
+                                    ),
+                                    cursorBrush = SolidColor(c.accent),
+                                    modifier = Modifier.width(64.dp),
+                                )
+                                if (active) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Check(color = c.accent)
+                                }
+                            }
+                        },
                     )
-                    if (status.isNotBlank()) {
+                }
+                MochiButtonRow(
+                    text = "写入 DPI（档位 ${activeDpiIndex + 1}）",
+                    onClick = { writeDpi() },
+                )
+            }
+        }
+
+        item {
+            MochiSection(header = "回报率") {
+                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    var sliderValue by remember { mutableFloatStateOf(rateIndex.toFloat()) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("回报率", fontSize = 15.sp, color = c.text)
                         Text(
-                            text = status,
-                            fontSize = 12.sp,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            "${MouseConfigService.RateHz[rateIndex]} Hz",
+                            fontSize = 15.sp,
+                            color = c.accent,
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-        }
-
-        item {
-            SmallTitle("DPI 档位")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    for (i in 0 until 6) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            TextButton(
-                                text = if (i == activeDpiIndex) "档位 ${i + 1} · 当前" else "档位 ${i + 1}",
-                                onClick = { activeDpiIndex = i },
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            TextField(
-                                value = dpiText[i],
-                                onValueChange = { input ->
-                                    dpiText[i] = input.filter { it.isDigit() }.take(5)
-                                },
-                                modifier = Modifier.weight(1f),
-                                label = "DPI",
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    TextButton(
-                        text = "写入 DPI（档位 ${activeDpiIndex + 1}）",
-                        onClick = { writeDpi() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    )
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-        }
-
-        item {
-            SmallTitle("回报率")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                    var sliderValue by remember { mutableFloatStateOf(rateIndex.toFloat()) }
-                    Text(
-                        text = "${MouseConfigService.RateHz[rateIndex]} Hz",
-                        fontSize = 20.sp,
-                        color = MiuixTheme.colorScheme.primary,
-                    )
-                    Spacer(Modifier.height(10.dp))
                     Slider(
                         value = sliderValue,
                         onValueChange = { sliderValue = it },
@@ -432,14 +455,8 @@ private fun MousePage(settings: AppSettings) {
                         },
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(16.dp))
-                    TextButton(
-                        text = "写入回报率",
-                        onClick = { writeRate() },
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !busy,
-                    )
                 }
+                MochiButtonRow(text = "写入回报率", onClick = { writeRate() })
             }
         }
     }
@@ -459,75 +476,86 @@ private fun SettingsPage(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = BottomInset),
+        contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = BottomInset),
+        verticalArrangement = Arrangement.spacedBy(22.dp),
     ) {
         item {
-            Spacer(Modifier.height(8.dp))
-            SmallTitle("常规")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    SwitchPreference(
-                        checked = autoStart,
-                        onCheckedChange = { checked ->
-                            autoStart = checked
-                            settings.autoStart = checked
-                            settings.save()
-                            Autostart.setEnabled(checked)
-                        },
-                        title = "开机自启",
-                        summary = "写入当前用户启动项，无需管理员权限",
-                    )
-                    SwitchPreference(
-                        checked = showPercent,
-                        onCheckedChange = { checked ->
-                            showPercent = checked
-                            settings.showPercentInTray = checked
-                            settings.save()
-                        },
-                        title = "托盘显示电量百分比",
-                    )
-                    SwitchPreference(
-                        checked = checkUpdates,
-                        onCheckedChange = { checked ->
-                            checkUpdates = checked
-                            settings.checkUpdates = checked
-                            settings.save()
-                        },
-                        title = "自动检查更新",
-                    )
-                }
-            }
-            Spacer(Modifier.height(18.dp))
-        }
-
-        item {
-            SmallTitle("关于")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    ArrowPreference(title = "版本", summary = "v$APP_VERSION")
-                    if (updateInfo.available && updateInfo.latestVersion.isNotBlank()) {
-                        ArrowPreference(
-                            title = "发现新版本 ${updateInfo.latestVersion}",
-                            summary = "点击打开下载页面",
-                            onClick = {
-                                runCatching {
-                                    java.awt.Desktop.getDesktop().browse(java.net.URI(updateInfo.htmlUrl))
-                                }
+            MochiSection(
+                header = "常规",
+                footer = "开机自启写入当前用户启动项，无需管理员权限",
+            ) {
+                MochiRow(
+                    title = "开机自启",
+                    divider = true,
+                    trailing = {
+                        MochiSwitch(
+                            checked = autoStart,
+                            onCheckedChange = { checked ->
+                                autoStart = checked
+                                settings.autoStart = checked
+                                settings.save()
+                                Autostart.setEnabled(checked)
                             },
                         )
-                    }
-                }
+                    },
+                )
+                MochiRow(
+                    title = "托盘显示电量百分比",
+                    divider = true,
+                    trailing = {
+                        MochiSwitch(
+                            checked = showPercent,
+                            onCheckedChange = { checked ->
+                                showPercent = checked
+                                settings.showPercentInTray = checked
+                                settings.save()
+                            },
+                        )
+                    },
+                )
+                MochiRow(
+                    title = "自动检查更新",
+                    divider = false,
+                    trailing = {
+                        MochiSwitch(
+                            checked = checkUpdates,
+                            onCheckedChange = { checked ->
+                                checkUpdates = checked
+                                settings.checkUpdates = checked
+                                settings.save()
+                            },
+                        )
+                    },
+                )
             }
-            Spacer(Modifier.height(18.dp))
         }
 
         item {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                TextButton(
-                    text = "退出程序",
-                    onClick = onExitRequested,
-                    modifier = Modifier.fillMaxWidth().padding(8.dp),
+            MochiSection(header = "关于") {
+                MochiRow(
+                    title = "版本",
+                    value = "v$APP_VERSION",
+                    divider = updateInfo.available && updateInfo.latestVersion.isNotBlank(),
                 )
+                if (updateInfo.available && updateInfo.latestVersion.isNotBlank()) {
+                    MochiRow(
+                        title = "发现新版本 ${updateInfo.latestVersion}",
+                        accent = true,
+                        chevron = true,
+                        divider = false,
+                        onClick = {
+                            runCatching {
+                                java.awt.Desktop.getDesktop().browse(java.net.URI(updateInfo.htmlUrl))
+                            }
+                        },
+                    )
+                }
+            }
+        }
+
+        item {
+            MochiSection {
+                MochiButtonRow(text = "退出程序", danger = true, onClick = onExitRequested)
             }
         }
     }

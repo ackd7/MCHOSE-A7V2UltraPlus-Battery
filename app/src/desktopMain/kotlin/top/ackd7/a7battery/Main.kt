@@ -52,7 +52,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.3"
+const val APP_VERSION = "2.0.4"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -72,6 +72,8 @@ fun main(args: Array<String>) {
     val settings = AppSettings.load()
     val monitor = BatteryMonitor()
     val startMinimized = args.contains("--minimized")
+    val initialPage = args.firstOrNull { it.startsWith("--page=") }
+        ?.substringAfter("=")?.toIntOrNull() ?: 0
 
     application {
         var tray by remember { mutableStateOf<NativeTrayIcon?>(null) }
@@ -160,6 +162,26 @@ fun main(args: Array<String>) {
 
             LaunchedEffect(Unit) {
                 runCatching { applyRoundedCorners(win) }
+                // 去掉 Swing 默认边框，避免无边框窗口右/下缘出现一条细线
+                runCatching { win.rootPane.border = null }
+            }
+
+            // 开发用：--screenshot 时把本窗口截图存到临时目录（便于无交互验证 UI）
+            LaunchedEffect(Unit) {
+                if (args.contains("--screenshot")) {
+                    kotlinx.coroutines.delay(3000)
+                    runCatching {
+                        win.isAlwaysOnTop = true
+                        win.toFront()
+                        win.requestFocus()
+                        Thread.sleep(900)
+                        val img = java.awt.Robot().createScreenCapture(win.bounds)
+                        val out = java.io.File(System.getProperty("java.io.tmpdir"), "a7-window.png")
+                        javax.imageio.ImageIO.write(img, "png", out)
+                        appLog("截图已保存: " + out.absolutePath)
+                        win.isAlwaysOnTop = false
+                    }.onFailure { appLog("截图失败: " + it.message) }
+                }
             }
 
             App(
@@ -187,6 +209,7 @@ fun main(args: Array<String>) {
                     monitor.stop()
                     exitApplication()
                 },
+                initialPage = initialPage,
             )
         }
 

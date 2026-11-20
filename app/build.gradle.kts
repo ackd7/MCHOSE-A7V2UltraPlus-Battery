@@ -11,7 +11,7 @@ plugins {
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突
 val appVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "2.0.3"
+    ?: "2.0.4"
 
 kotlin {
     jvm("desktop")
