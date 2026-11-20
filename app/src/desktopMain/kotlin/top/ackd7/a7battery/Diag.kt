@@ -85,6 +85,67 @@ fun main() {
     }
 
     println()
+    println("=== 回报率字段探测（写 2000Hz 再看哪个字节变）===")
+    runCatching {
+        val svc = MouseConfigService()
+        val before = svc.read()
+        println("before: ok=${before.success} usbRate=${before.usbRateIndex} gRate=${before.wirelessRateIndex} activeDpi=${before.activeDpiIndex}")
+        println("before raw: ${before.raw}")
+        if (before.success) {
+            val (wOk, wErr) = svc.setRate(3) // 3 -> 2000Hz（8K 档位表）
+            println("write rate=3 ok=$wOk err=$wErr")
+            Thread.sleep(500)
+            val after = svc.read()
+            println("after : ok=${after.success} usbRate=${after.usbRateIndex} gRate=${after.wirelessRateIndex} activeDpi=${after.activeDpiIndex}")
+            println("after  raw: ${after.raw}")
+            if (before.usbRateIndex >= 0) {
+                val (rOk, _) = svc.setRate(before.usbRateIndex)
+                println("restore rate=${before.usbRateIndex} ok=$rOk")
+            }
+        }
+    }.onFailure { println("探测异常: ${it.message}") }
+
+    println()
+    println("=== 多命令扫描：找回报率字段（先写 2000Hz=index3）===")
+    runCatching {
+        val svc = MouseConfigService()
+        svc.read()
+        svc.setRate(3)
+        Thread.sleep(400)
+        val dev = top.ackd7.a7battery.interop.HidNative.enumerate()
+            .firstOrNull { it.vendorId == 0x3837 && it.usagePage == 0xFF01 }
+        if (dev == null) {
+            println("  未找到 FF01 通道")
+        } else {
+            top.ackd7.a7battery.interop.HidNative.HidSession(dev.path, 65).use { sess ->
+                sess.flush(20)
+                // bond
+                val bond = ByteArray(65) { 0xFF.toByte() }
+                bond[0] = 0x11
+                bond[1] = (0x03 xor 0xFF).toByte()
+                sess.setFeature(bond)
+                Thread.sleep(150)
+                sess.read(300)
+                for (cmd in intArrayOf(0x03, 0x0B, 0x40, 0x41, 0x42, 0x67)) {
+                    val f = ByteArray(65) { 0xFF.toByte() }
+                    f[0] = 0x11
+                    f[1] = (cmd xor 0xFF).toByte()
+                    sess.setFeature(f)
+                    Thread.sleep(150)
+                    val gb = ByteArray(65)
+                    gb[0] = 0x11
+                    val ok = sess.getFeature(gb)
+                    val hex = gb.copyOfRange(0, 20).joinToString(" ") { "%02X".format(it) }
+                    println("  cmd=0x%02X ok=%s : %s".format(cmd, ok, hex))
+                    sess.read(120)
+                }
+            }
+            // 还原
+            svc.setRate(0)
+        }
+    }.onFailure { println("扫描异常: ${it.message}") }
+
+    println()
     println("=== 尝试读取鼠标配置（DPI / 回报率）===")
     val cfg = MouseConfigService().read()
     println("success=${cfg.success} activeDpiIndex=${cfg.activeDpiIndex} dpi=${cfg.dpiStages.joinToString()}")

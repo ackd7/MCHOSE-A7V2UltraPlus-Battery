@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -40,6 +41,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,8 +95,13 @@ fun App(
 ) {
     AppTheme {
         var page by remember { mutableIntStateOf(initialPage.coerceIn(0, 2)) }
+        // 鼠标配置状态放在这里：切页不丢，启动即自动读取
+        val mouseState = rememberMouseConfigUiState(settings)
 
-        LaunchedEffect(Unit) { top.ackd7.a7battery.appLog("UI 已组合（横向自适应布局）") }
+        LaunchedEffect(Unit) {
+            top.ackd7.a7battery.appLog("UI 已组合（横向自适应布局）")
+            mouseState.refresh()
+        }
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -108,7 +115,7 @@ fun App(
                     Box(modifier = Modifier.widthIn(max = 1040.dp).fillMaxHeight()) {
                         when (page) {
                             0 -> BatteryPage(settings, monitor, battery, wide)
-                            1 -> MousePage(settings, wide)
+                            1 -> MousePage(settings, mouseState, wide)
                             else -> SettingsPage(settings, updateInfo, onExitRequested, wide)
                         }
                     }
@@ -337,21 +344,31 @@ private fun formatTime(epochMs: Long): String = runCatching {
 
 // ---------------- 鼠标页 ----------------
 
-@Composable
-private fun MousePage(settings: AppSettings, wide: Boolean) {
-    val mouse = remember { MouseConfigService() }
-    // 组合作用域：在其上 launch，协程体默认回到 UI 线程
-    // （Compose Desktop 默认没有 Dispatchers.Main，直接用会抛 IllegalStateException）
-    val scope = rememberCoroutineScope()
-    val dpiText = remember {
-        mutableStateListOf(*settings.dpiStages.map { it.toString() }.toTypedArray())
-    }
-    var activeDpiIndex by remember { mutableIntStateOf(settings.activeDpiIndex) }
-    var rateIndex by remember { mutableIntStateOf(rateIndexFromHz(settings.rateHz)) }
-    var status by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
+/**
+ * 鼠标配置的 UI 状态（提升到 App 层，切页/重开不丢失）。
+ *
+ * 说明：A7 V2 Ultra+ 的 `0x12 0x67` 报告里不含回报率字段
+ * （实测写入 2000Hz 后回读字节完全不变，低 4 位恒为 0，直接解析永远得到 125Hz），
+ * 所以回报率只显示本地记录的值，不回读设备。
+ */
+@Stable
+class MouseConfigUiState(
+    private val settings: AppSettings,
+    private val mouse: MouseConfigService,
+    private val scope: CoroutineScope,
+) {
+    val dpiText = mutableStateListOf(*settings.dpiStages.map { it.toString() }.toTypedArray())
+    var activeDpiIndex by mutableIntStateOf(settings.activeDpiIndex)
+    var rateIndex by mutableIntStateOf(rateIndexFromHz(settings.rateHz))
+    var status by mutableStateOf("")
 
-    fun readConfig() {
+    var busy by mutableStateOf(false)
+        private set
+
+    var loaded by mutableStateOf(false)
+        private set
+
+    fun refresh() {
         if (busy) return
         busy = true
         status = "正在读取…"
@@ -361,15 +378,11 @@ private fun MousePage(settings: AppSettings, wide: Boolean) {
             if (cfg.success) {
                 for (i in 0 until 6) dpiText[i] = cfg.dpiStages[i].toString()
                 if (cfg.activeDpiIndex in 0..5) activeDpiIndex = cfg.activeDpiIndex
-                val hz = when {
-                    cfg.usbRateIndex in MouseConfigService.RateHz.indices ->
-                        MouseConfigService.RateHz[cfg.usbRateIndex]
-                    cfg.wirelessRateIndex in MouseConfigService.RateHz.indices ->
-                        MouseConfigService.RateHz[cfg.wirelessRateIndex]
-                    else -> -1
-                }
-                if (hz > 0) rateIndex = rateIndexFromHz(hz)
-                status = "已读取：当前档位 ${activeDpiIndex + 1} · ${MouseConfigService.RateHz[rateIndex]} Hz"
+                settings.dpiStages = IntArray(6) { cfg.dpiStages[it] }
+                settings.activeDpiIndex = activeDpiIndex
+                settings.save()
+                loaded = true
+                status = "已读取：当前档位 ${activeDpiIndex + 1}"
             } else {
                 status = "读取失败：${cfg.error}"
             }
@@ -413,38 +426,49 @@ private fun MousePage(settings: AppSettings, wide: Boolean) {
             if (ok) {
                 settings.rateHz = MouseConfigService.RateHz[rateIndex]
                 settings.save()
-                status = "回报率已写入：${MouseConfigService.RateHz[rateIndex]} Hz"
+                status = "回报率已按 ${MouseConfigService.RateHz[rateIndex]} Hz 发送"
             } else {
                 status = "回报率写入失败：$err"
             }
         }
     }
+}
 
+@Composable
+private fun rememberMouseConfigUiState(settings: AppSettings): MouseConfigUiState {
+    val scope = rememberCoroutineScope()
+    return remember(settings) {
+        MouseConfigUiState(settings, MouseConfigService(), scope)
+    }
+}
+
+@Composable
+private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Boolean) {
     val deviceSection: @Composable () -> Unit = {
-        MochiSection(header = "设备配置", footer = status.ifBlank { null }) {
+        MochiSection(header = "设备配置", footer = state.status.ifBlank { null }) {
             MochiRow(
-                title = "读取当前配置",
-                subtitle = "从鼠标回读 DPI 与回报率",
+                title = "重新读取配置",
+                subtitle = "从鼠标回读 DPI 档位（启动时已自动读取）",
                 chevron = true,
                 divider = false,
-                onClick = { readConfig() },
+                onClick = { state.refresh() },
             )
         }
     }
     val dpiSection: @Composable () -> Unit = {
         DpiSection(
-            dpiText = dpiText,
-            activeDpiIndex = activeDpiIndex,
-            onSelect = { activeDpiIndex = it },
-            onWrite = { writeDpi() },
+            dpiText = state.dpiText,
+            activeDpiIndex = state.activeDpiIndex,
+            onSelect = { state.activeDpiIndex = it },
+            onWrite = { state.writeDpi() },
             wide = wide,
         )
     }
     val rateSection: @Composable () -> Unit = {
         RateSection(
-            rateIndex = rateIndex,
-            onRateChange = { rateIndex = it },
-            onWrite = { writeRate() },
+            rateIndex = state.rateIndex,
+            onRateChange = { state.rateIndex = it },
+            onWrite = { state.writeRate() },
         )
     }
 
@@ -538,7 +562,10 @@ private fun DpiSection(
 @Composable
 private fun RateSection(rateIndex: Int, onRateChange: (Int) -> Unit, onWrite: () -> Unit) {
     val c = rememberMochiColors()
-    MochiSection(header = "回报率") {
+    MochiSection(
+        header = "回报率",
+        footer = "此型号的配置报告不含回报率字段（回读恒为 125 Hz），这里显示本地记录值；写入后以实际手感为准。",
+    ) {
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
             var sliderValue by remember(rateIndex) { mutableFloatStateOf(rateIndex.toFloat()) }
             Row(
