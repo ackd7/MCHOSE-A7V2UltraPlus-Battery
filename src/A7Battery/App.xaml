@@ -5,35 +5,36 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Material Design 3 配色：浅色主题 + 紫罗兰主色 + 青柠强调色 -->
-                <materialDesign:BundledTheme BaseTheme="Light" PrimaryColor="DeepPurple" SecondaryColor="Teal"/>
-                <!-- Material Design 3 控件样式 -->
+                <!-- 控件基础样式：主色跟随 miuix 蓝 -->
+                <materialDesign:BundledTheme BaseTheme="Light" PrimaryColor="Blue" SecondaryColor="LightBlue"/>
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml"/>
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- A7 语义画刷默认值（紫罗兰 MD3 调色板）。动态/静态取色时由 ThemeService 运行时覆盖。 -->
-            <SolidColorBrush x:Key="A7.Primary" Color="#6750A4"/>
+            <!-- miuix lightColorScheme 语义画刷默认值（照搬 compose-miuix-ui/miuix 的 Colors.kt）。
+                 动态/静态取色时由 ThemeService 在 miuix 骨架上覆盖主色系。 -->
+            <SolidColorBrush x:Key="A7.Primary" Color="#3482FF"/>
             <SolidColorBrush x:Key="A7.OnPrimary" Color="#FFFFFF"/>
-            <SolidColorBrush x:Key="A7.PrimaryContainer" Color="#EADDFF"/>
-            <SolidColorBrush x:Key="A7.OnPrimaryContainer" Color="#21005D"/>
-            <SolidColorBrush x:Key="A7.Secondary" Color="#625B71"/>
-            <SolidColorBrush x:Key="A7.OnSecondary" Color="#FFFFFF"/>
-            <SolidColorBrush x:Key="A7.SecondaryContainer" Color="#E8DEF8"/>
-            <SolidColorBrush x:Key="A7.OnSecondaryContainer" Color="#1D192B"/>
-            <SolidColorBrush x:Key="A7.Tertiary" Color="#7D5260"/>
-            <SolidColorBrush x:Key="A7.OnTertiary" Color="#FFFFFF"/>
-            <SolidColorBrush x:Key="A7.Background" Color="#FFFBFE"/>
-            <SolidColorBrush x:Key="A7.OnBackground" Color="#1D1B20"/>
-            <SolidColorBrush x:Key="A7.Surface" Color="#FFFBFE"/>
-            <SolidColorBrush x:Key="A7.OnSurface" Color="#1D1B20"/>
-            <SolidColorBrush x:Key="A7.SurfaceVariant" Color="#E7E0EC"/>
-            <SolidColorBrush x:Key="A7.OnSurfaceVariant" Color="#49454F"/>
-            <SolidColorBrush x:Key="A7.SurfaceContainer" Color="#F3EDF7"/>
-            <SolidColorBrush x:Key="A7.SurfaceContainerLow" Color="#F7F2FA"/>
-            <SolidColorBrush x:Key="A7.SurfaceContainerHigh" Color="#ECE6F0"/>
-            <SolidColorBrush x:Key="A7.Divider" Color="#E7E0EC"/>
-            <SolidColorBrush x:Key="A7.Outline" Color="#79747E"/>
-            <SolidColorBrush x:Key="A7.OutlineVariant" Color="#CAC4D0"/>
+            <SolidColorBrush x:Key="A7.PrimaryContainer" Color="#5D9BFF"/>
+            <SolidColorBrush x:Key="A7.OnPrimaryContainer" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="A7.Secondary" Color="#E6E6E6"/>
+            <SolidColorBrush x:Key="A7.OnSecondary" Color="#303030"/>
+            <SolidColorBrush x:Key="A7.SecondaryContainer" Color="#F0F0F0"/>
+            <SolidColorBrush x:Key="A7.OnSecondaryContainer" Color="#A9A9A9"/>
+            <SolidColorBrush x:Key="A7.Tertiary" Color="#EAF2FF"/>
+            <SolidColorBrush x:Key="A7.OnTertiary" Color="#3482FF"/>
+            <SolidColorBrush x:Key="A7.Background" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="A7.OnBackground" Color="#000000"/>
+            <SolidColorBrush x:Key="A7.Surface" Color="#F7F7F7"/>
+            <SolidColorBrush x:Key="A7.OnSurface" Color="#000000"/>
+            <SolidColorBrush x:Key="A7.SurfaceVariant" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="A7.OnSurfaceVariant" Color="#8C93B0"/>
+            <SolidColorBrush x:Key="A7.SurfaceContainer" Color="#FFFFFF"/>
+            <SolidColorBrush x:Key="A7.SurfaceContainerLow" Color="#F7F7F7"/>
+            <SolidColorBrush x:Key="A7.SurfaceContainerHigh" Color="#E8E8E8"/>
+            <SolidColorBrush x:Key="A7.Divider" Color="#E0E0E0"/>
+            <SolidColorBrush x:Key="A7.Outline" Color="#D9D9D9"/>
+            <SolidColorBrush x:Key="A7.OutlineVariant" Color="#E8E8E8"/>
+            <SolidColorBrush x:Key="A7.Error" Color="#E94634"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

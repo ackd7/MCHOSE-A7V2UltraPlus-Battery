@@ -98,34 +98,34 @@ namespace A7Battery.Services
 
             // 2) 写入自定义 MD3 语义画刷
             var r = Application.Current.Resources;
+            // 主色系跟随种子色（保持取色功能），但规整到 miuix 的明度层级
             Set(r, "A7.Primary", primary.Tone(40));
             Set(r, "A7.OnPrimary", primary.Tone(100));
             Set(r, "A7.PrimaryContainer", primary.Tone(90));
             Set(r, "A7.OnPrimaryContainer", primary.Tone(10));
 
-            Set(r, "A7.Secondary", secondary.Tone(40));
-            Set(r, "A7.OnSecondary", secondary.Tone(100));
-            Set(r, "A7.SecondaryContainer", secondary.Tone(90));
-            Set(r, "A7.OnSecondaryContainer", secondary.Tone(10));
+            // miuix 骨架：次要与表面固定为其中性色阶，不随种子色漂移——这是 miuix 视觉的统一感来源
+            Set(r, "A7.Secondary", Color.FromRgb(0xE6, 0xE6, 0xE6));
+            Set(r, "A7.OnSecondary", Color.FromRgb(0x30, 0x30, 0x30));
+            Set(r, "A7.SecondaryContainer", Color.FromRgb(0xF0, 0xF0, 0xF0));
+            Set(r, "A7.OnSecondaryContainer", Color.FromRgb(0xA9, 0xA9, 0xA9));
+            Set(r, "A7.Tertiary", Color.FromRgb(0xEA, 0xF2, 0xFF));
+            Set(r, "A7.OnTertiary", primary.Tone(40));
+            Set(r, "A7.TertiaryContainer", Color.FromRgb(0xEA, 0xF2, 0xFF));
 
-            Set(r, "A7.Tertiary", tertiary.Tone(40));
-            Set(r, "A7.OnTertiary", tertiary.Tone(100));
-            Set(r, "A7.TertiaryContainer", tertiary.Tone(90));
-
-            // Surface 系列来自 neutral / neutralVariant（MD3 的 surface 带一点主色相）
-            Set(r, "A7.Background", neutral.Tone(98));
-            Set(r, "A7.OnBackground", neutral.Tone(10));
-            Set(r, "A7.Surface", neutral.Tone(98));
-            Set(r, "A7.OnSurface", neutral.Tone(10));
-            Set(r, "A7.SurfaceVariant", neutralVariant.Tone(90));
-            Set(r, "A7.OnSurfaceVariant", neutralVariant.Tone(30));
-            Set(r, "A7.SurfaceContainer", neutral.Tone(94));
-            Set(r, "A7.SurfaceContainerLow", neutral.Tone(96));
-            Set(r, "A7.SurfaceContainerHigh", neutral.Tone(92));
-            Set(r, "A7.Divider", neutralVariant.Tone(80));
-            Set(r, "A7.Outline", neutralVariant.Tone(50));
-            Set(r, "A7.OutlineVariant", neutralVariant.Tone(80));
-            Set(r, "A7.Error", error.Tone(40));
+            Set(r, "A7.Background", Colors.White);
+            Set(r, "A7.OnBackground", Colors.Black);
+            Set(r, "A7.Surface", Color.FromRgb(0xF7, 0xF7, 0xF7));
+            Set(r, "A7.OnSurface", Colors.Black);
+            Set(r, "A7.SurfaceVariant", Colors.White);
+            Set(r, "A7.OnSurfaceVariant", Color.FromRgb(0x8C, 0x93, 0xB0)); // miuix 标志性蓝调灰
+            Set(r, "A7.SurfaceContainer", Colors.White);
+            Set(r, "A7.SurfaceContainerLow", Color.FromRgb(0xF7, 0xF7, 0xF7));
+            Set(r, "A7.SurfaceContainerHigh", Color.FromRgb(0xE8, 0xE8, 0xE8));
+            Set(r, "A7.Divider", Color.FromRgb(0xE0, 0xE0, 0xE0));
+            Set(r, "A7.Outline", Color.FromRgb(0xD9, 0xD9, 0xD9));
+            Set(r, "A7.OutlineVariant", Color.FromRgb(0xE8, 0xE8, 0xE8));
+            Set(r, "A7.Error", Color.FromRgb(0xE9, 0x46, 0x34));
         }
 
         /// <summary>

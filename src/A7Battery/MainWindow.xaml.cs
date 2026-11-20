@@ -35,7 +35,7 @@ public sealed partial class MainWindow : Window
         // 系统级圆角（不透明窗口，4K 下文字清晰；替代 AllowsTransparency 位图缩放）
         SourceInitialized += (_, _) => WindowRounding.Apply(this);
 
-        // 关闭按钮走自绘 ExitApp；系统级关闭（Alt+F4 等）仍隐藏到托盘
+        // 关闭窗口（含自绘 X 与 Alt+F4）只隐藏到托盘，后台监控继续运行
         Closing += (_, e) => { e.Cancel = true; Hide(); };
         // 最大化图标随窗口状态切换（圆角由系统 DWM 处理）
         StateChanged += (_, _) =>
@@ -84,7 +84,8 @@ public sealed partial class MainWindow : Window
             : MaterialDesignThemes.Wpf.PackIconKind.WindowMaximize;
     }
 
-    private void CloseBtn_Click(object sender, RoutedEventArgs e) => _app.ExitApp();
+    // 关闭按钮只隐藏窗口，后台监控与托盘继续运行；完全退出请用托盘右键「退出」
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => Hide();
 
     private void ApplySettings()
     {

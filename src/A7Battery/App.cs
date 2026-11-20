@@ -10,7 +10,7 @@ namespace A7Battery;
 
 public sealed partial class App : Application
 {
-    public const string AppVersion = "1.6.0";
+    public const string AppVersion = "1.7.0";
 
     private AppSettings _settings = null!;
     private BatteryMonitor _monitor = null!;
