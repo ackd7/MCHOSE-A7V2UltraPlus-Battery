@@ -90,23 +90,50 @@ jobs:
           Write-Host "=== 打包产物 ==="
           Get-ChildItem -Path app\build\compose\binaries -Recurse -Include *.msi,*.exe,*.zip -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
 
+      - name: 生成 Release 说明（从 CHANGELOG 提取）
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $lines = Get-Content -Path CHANGELOG.md -Encoding UTF8
+          $note = @()
+          $capture = $false
+          foreach ($l in $lines) {
+            if ($l -match '^##\s') {
+              if ($capture) { break }
+              if ($l -match [regex]::Escape($ver)) { $capture = $true; continue }
+            } elseif ($capture) { $note += $l }
+          }
+          while ($note.Count -gt 0 -and [string]::IsNullOrWhiteSpace($note[-1])) {
+            $note = @($note | Select-Object -First ($note.Count - 1))
+          }
+          if ($note.Count -eq 0) { $note = @('- 本版本未在 CHANGELOG.md 中找到条目') }
+
+          $body = @()
+          $body += '## 更新内容'
+          $body += ''
+          $body += $note
+          $body += ''
+          $body += '## 下载'
+          $body += ''
+          $body += ('- **推荐**：`A7Battery-Setup-{0}.exe` —— 中文安装向导，可勾选「创建桌面快捷方式」「开机自动启动」，无需管理员权限' -f $ver)
+          $body += ('- **备用**：`A7Battery-{0}.msi` —— Windows Installer（英文向导）' -f $ver)
+          $body += ''
+          $body += '## 说明'
+          $body += ''
+          $body += '- 界面参考 [mochi-compose](https://github.com/feice11/mochi-compose)：iOS 式分组卡片 + 悬浮胶囊标签栏'
+          $body += '- 安装包自带 JRE，无需额外运行时'
+          $body += '- 支持迈从 MCHOSE A7 V2 Ultra+ 电量读取、DPI / 回报率读写'
+
+          $body | Set-Content -Path release-notes.md -Encoding UTF8
+          Write-Host '=== Release 说明 ==='
+          Get-Content release-notes.md -Encoding UTF8
+
       - name: 创建 Release 并上传产物
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.version.outputs.version) }}
           name: A7Battery v${{ steps.version.outputs.version }}
-          body: |
-            A7 电量助手（Compose Desktop + miuix 版）
-
-            ## 下载
-            - **推荐**：`A7Battery-Setup-${{ steps.version.outputs.version }}.exe`
-              中文安装向导，安装时可勾选「创建桌面快捷方式」「开机自动启动」，按当前用户安装、无需管理员权限。
-            - **备用**：`A7Battery-${{ steps.version.outputs.version }}.msi`（Windows Installer，英文向导）
-
-            ## 说明
-            - 界面参考 [mochi-compose](https://github.com/feice11/mochi-compose)：iOS 式分组卡片 + 悬浮胶囊标签栏
-            - 免安装运行时，安装包自带 JRE
-            - 支持迈从 MCHOSE A7 V2 Ultra+ 精确电量、DPI/回报率读写
+          body_path: release-notes.md
           files: |
             dist/*.exe
             app/build/compose/binaries/**/*.msi

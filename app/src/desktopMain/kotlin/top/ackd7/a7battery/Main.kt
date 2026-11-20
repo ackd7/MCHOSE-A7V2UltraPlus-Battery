@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -28,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -53,7 +55,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.7"
+const val APP_VERSION = "2.0.8"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -215,6 +217,55 @@ fun main(args: Array<String>) {
                         appLog("窗口已还原（deiconified）")
                     }
                 })
+            }
+
+            // 开发用：Robot 拖拽标题栏，验证窗口跟随鼠标且不会飞出屏幕
+            // 注意 Robot 操作必须放在 IO 线程，否则 Thread.sleep 阻塞 EDT 会让指针事件滞后
+            LaunchedEffect(Unit) {
+                if (args.contains("--test-drag")) {
+                    kotlinx.coroutines.delay(3000)
+                    win.isAlwaysOnTop = true
+                    win.toFront()
+                    win.requestFocus()
+                    kotlinx.coroutines.delay(800)
+                    val before = win.bounds
+                    val moved = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val robot = java.awt.Robot()
+                            val startX = before.x + 120
+                            val startY = before.y + 24
+                            robot.mouseMove(startX, startY)
+                            Thread.sleep(250)
+                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(150)
+                            for (step in 1..20) {
+                                robot.mouseMove(startX + step * 10, startY + step * 6)
+                                Thread.sleep(30)
+                            }
+                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(600)
+                            true
+                        }.getOrElse {
+                            appLog("测试拖拽异常: " + it.message)
+                            false
+                        }
+                    }
+                    kotlinx.coroutines.delay(400)
+                    val after = win.bounds
+                    appLog(
+                        "测试拖拽(after=$moved)：before=(${before.x},${before.y}) " +
+                            "after=(${after.x},${after.y}) 期望≈(200,120) " +
+                            "实际=(${after.x - before.x},${after.y - before.y}) " +
+                            "visible=${win.isVisible} state=${win.extendedState}",
+                    )
+                    runCatching {
+                        val img = java.awt.Robot().createScreenCapture(win.bounds)
+                        val out = java.io.File(System.getProperty("java.io.tmpdir"), "a7-drag.png")
+                        javax.imageio.ImageIO.write(img, "png", out)
+                        appLog("测试拖拽：截图 = " + out.absolutePath)
+                    }
+                    win.isAlwaysOnTop = false
+                }
             }
 
             // 开发用：用 Robot 点击标题栏空白处（标题右侧、按钮左侧），复现「点空白就消失」
@@ -454,20 +505,64 @@ private fun AppTitleBar(
     }
 }
 
-/** 拖动标题栏移动窗口；双击切换最大化。 */
+/**
+ * 拖动标题栏移动窗口；双击标题栏切换最大化。
+ *
+ * 位移必须换算成「真实屏幕指针位置」再定位窗口：
+ * 直接用 detectDragGestures 的 dragAmount 累加 window.location 会形成正反馈
+ * （窗口一动，指针在窗口内的局部坐标也跟着变，下一帧把这段位移又算一遍），
+ * 结果是窗口越拖越快、飞出屏幕 —— 表现就是「一拖窗口就消失，任务栏仍有图标」。
+ *
+ * 屏幕指针 = 窗口位置 + 节点在窗口内的偏移 + 事件局部坐标，
+ * 这个值不受我们移动窗口的影响，因此没有反馈环。
+ */
+@Composable
 private fun Modifier.dragWindow(
     window: java.awt.Window,
     onDoubleClick: () -> Unit,
-): Modifier = this
-    .pointerInput(window) {
-        detectTapGestures(onDoubleTap = { onDoubleClick() })
-    }
-    .pointerInput(window) {
-        detectDragGestures { change, drag ->
-            change.consume()
-            window.setLocation(window.x + drag.x.toInt(), window.y + drag.y.toInt())
+): Modifier {
+    val offsetInWindow = remember { mutableStateOf(Offset.Zero) }
+    return this
+        .onGloballyPositioned { offsetInWindow.value = it.positionInWindow() }
+        .pointerInput(window) {
+            detectTapGestures(onDoubleTap = { onDoubleClick() })
         }
-    }
+        .pointerInput(window) {
+            var grabX = 0f
+            var grabY = 0f
+            detectDragGestures(
+                onDragStart = { pos ->
+                    // 指针相对窗口左上角的偏移，拖拽过程中保持不变
+                    grabX = offsetInWindow.value.x + pos.x
+                    grabY = offsetInWindow.value.y + pos.y
+                },
+                onDrag = { change, _ ->
+                    change.consume()
+                    val screenX = window.x + offsetInWindow.value.x + change.position.x
+                    val screenY = window.y + offsetInWindow.value.y + change.position.y
+                    val (nx, ny) = clampToScreen(
+                        window,
+                        (screenX - grabX).toInt(),
+                        (screenY - grabY).toInt(),
+                    )
+                    window.setLocation(nx, ny)
+                },
+            )
+        }
+}
+
+/** 保证窗口至少有一块留在某个屏幕内。 */
+private fun clampToScreen(window: java.awt.Window, x: Int, y: Int): Pair<Int, Int> {
+    val screens = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+        .screenDevices.map { it.defaultConfiguration.bounds }
+    if (screens.isEmpty()) return x to y
+    val keepVisible = 120
+    val minX = screens.minOf { it.x } - window.width + keepVisible
+    val maxX = screens.maxOf { it.x + it.width } - keepVisible
+    val minY = screens.minOf { it.y }
+    val maxY = screens.maxOf { it.y + it.height } - 60
+    return x.coerceIn(minX, maxX) to y.coerceIn(minY, maxY)
+}
 
 @Composable
 private fun WindowButton(
