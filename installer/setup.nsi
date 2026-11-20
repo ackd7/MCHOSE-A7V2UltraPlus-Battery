@@ -15,7 +15,7 @@ Unicode true
   !define APP_VERSION "0.0.0"
 !endif
 
-!define APP_NAME      "A7 电量助手"
+!define APP_NAME      "MCHOSE A7 V2 Ultra+ Battery"
 !define APP_EXE       "A7Battery.exe"
 !define APP_PUBLISHER "ackd7"
 !define APP_REGKEY    "Software\Microsoft\Windows\CurrentVersion\Uninstall\A7Battery"
@@ -27,7 +27,7 @@ Unicode true
 !endif
 
 Name "${APP_NAME}"
-OutFile "${OUT_DIR}\A7Battery-Setup-${APP_VERSION}.exe"
+OutFile "${OUT_DIR}\MCHOSE-A7V2-Ultra-Battery-Setup-${APP_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\A7Battery"
 InstallDirRegKey HKCU "Software\A7Battery" "InstallDir"
 RequestExecutionLevel user
@@ -78,6 +78,12 @@ Section "主程序（必需）" SecMain
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "$INSTDIR\${APP_EXE}"
   CreateShortCut "$SMPROGRAMS\${APP_NAME}\卸载 ${APP_NAME}.lnk" "$INSTDIR\Uninstall.exe"
 
+  ; 旧版本（A7 电量助手）遗留的快捷方式，升级时一并清掉
+  Delete "$DESKTOP\A7 电量助手.lnk"
+  Delete "$SMPROGRAMS\A7 电量助手\A7 电量助手.lnk"
+  Delete "$SMPROGRAMS\A7 电量助手\卸载 A7 电量助手.lnk"
+  RMDir "$SMPROGRAMS\A7 电量助手"
+
   WriteUninstaller "$INSTDIR\Uninstall.exe"
 
   ; 卸载信息（设置 → 应用）
@@ -117,6 +123,7 @@ Section "Uninstall"
   Sleep 300
 
   Delete "$DESKTOP\${APP_NAME}.lnk"
+  Delete "$DESKTOP\A7 电量助手.lnk"
   Delete "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk"
   Delete "$SMPROGRAMS\${APP_NAME}\卸载 ${APP_NAME}.lnk"
   RMDir  "$SMPROGRAMS\${APP_NAME}"

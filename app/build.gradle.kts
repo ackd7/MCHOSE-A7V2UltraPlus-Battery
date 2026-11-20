@@ -59,10 +59,14 @@ compose.desktop {
             targetFormats(TargetFormat.Msi)
             packageName = "A7Battery"
             packageVersion = appVersion
+            // 显示名称与版本信息（exe 属性里的"产品名称/公司"）
+            description = "MCHOSE A7 V2 Ultra+ Battery"
+            vendor = "ackd7"
+            copyright = "© 2026 ackd7"
 
             windows {
                 // 注意：menuGroup 不用中文，避免 GitHub Actions Windows runner 编码乱码导致打包失败
-                menuGroup = "A7Battery"
+                menuGroup = "MCHOSE A7 V2 Ultra+ Battery"
                 // MSI 安装时创建开始菜单与桌面快捷方式
                 menu = true
                 shortcut = true

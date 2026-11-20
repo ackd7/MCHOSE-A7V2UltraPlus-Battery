@@ -1,4 +1,4 @@
-# A7 Battery
+# MCHOSE A7 V2 Ultra+ Battery
 
 一个基于 **Compose Multiplatform (Kotlin) + miuix** 的 Windows 托盘小工具，用于查看 **迈从 MCHOSE A7 V2 Ultra+** 无线鼠标的精确电量。
 
@@ -49,7 +49,7 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 
 从 [Releases](../../releases) 下载，有两种分发形式：
 
-- **安装向导（推荐）**：`A7Battery-Setup-<版本>.exe` —— 中文向导，按当前用户安装（无需管理员），
+- **安装向导（推荐）**：`MCHOSE-A7V2-Ultra-Battery-Setup-<版本>.exe` —— 中文向导，按当前用户安装（无需管理员），
   安装时可勾选 **创建桌面快捷方式**、**开机自动启动**；卸载可在「设置 → 应用」里完成，用户配置会保留。
 - **MSI 安装包**：`A7Battery-<版本>.msi` —— 系统级 Windows Installer（英文向导），会自动建开始菜单与桌面快捷方式。
 

@@ -55,7 +55,10 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.1.0"
+const val APP_VERSION = "3.1.1"
+
+/** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
+const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
 
 /** 启动参数（供 UI 层读取开发开关）。 */
 private var startupArgs: Array<String> = emptyArray()
@@ -144,7 +147,7 @@ fun main(args: Array<String>) {
                     javax.swing.SwingUtilities.invokeLater { exitApplication() }
                 }
                 tray = t
-                t.setIcon(null, false, "A7 电量助手")
+                t.setIcon(null, false, APP_NAME)
                 appLog("托盘已创建")
             } catch (e: Exception) {
                 appLog("托盘创建失败: ${e.message}")
@@ -192,11 +195,11 @@ fun main(args: Array<String>) {
                             t.setIcon(
                                 effective.percent,
                                 effective.charging,
-                                "迈从 A7 V2 Ultra+  ${effective.percent}%" +
+                                APP_NAME + "  ${effective.percent}%" +
                                     (if (effective.stale) "（休眠，上次读数）" else if (effective.charging) "  充电中" else "  放电中"),
                             )
                         } else {
-                            t.setIcon(null, false, "A7 电量助手（设备休眠/未连接）")
+                            t.setIcon(null, false, "$APP_NAME（设备休眠/未连接）")
                         }
                     }
                 }
@@ -223,7 +226,7 @@ fun main(args: Array<String>) {
 
         Window(
             onCloseRequest = { isVisible = false },
-            title = "A7 电量助手",
+            title = APP_NAME,
             state = windowState,
             undecorated = true,
         ) {
@@ -481,7 +484,7 @@ fun main(args: Array<String>) {
                 titleBar = {
                     AppTitleBar(
                         window = win,
-                        title = "A7 电量助手",
+                        title = APP_NAME,
                         subtitle = "v$APP_VERSION",
                         isMaximized = isMax,
                         onMinimize = {
@@ -614,47 +617,78 @@ private fun AppTitleBar(
 /**
  * 拖动标题栏移动窗口；双击标题栏切换最大化。
  *
- * 位移必须换算成「真实屏幕指针位置」再定位窗口：
- * 直接用 detectDragGestures 的 dragAmount 累加 window.location 会形成正反馈
- * （窗口一动，指针在窗口内的局部坐标也跟着变，下一帧把这段位移又算一遍），
- * 结果是窗口越拖越快、飞出屏幕 —— 表现就是「一拖窗口就消失，任务栏仍有图标」。
+ * 抖动原因：早期实现用「窗口位置 + 节点偏移 + 事件局部坐标」反推屏幕指针。
+ * 事件里的局部坐标是按"事件产生时"的窗口位置算的，而我们处理时窗口可能已经移动，
+ * 两者错开一点就会来回修正 → 拖动时文字/图标发抖。
  *
- * 屏幕指针 = 窗口位置 + 节点在窗口内的偏移 + 事件局部坐标，
- * 这个值不受我们移动窗口的影响，因此没有反馈环。
+ * 现在只认「按下那一刻的屏幕指针位置」和「那一刻的窗口位置」：
+ *     新窗口位置 = 起始窗口位置 + (当前指针 - 起始指针)
+ * 与窗口当前状态无关，不存在反馈，也不会抖。
  */
-@Composable
 private fun Modifier.dragWindow(
     window: java.awt.Window,
     onDoubleClick: () -> Unit,
-): Modifier {
-    val offsetInWindow = remember { mutableStateOf(Offset.Zero) }
-    return this
-        .onGloballyPositioned { offsetInWindow.value = it.positionInWindow() }
-        .pointerInput(window) {
-            detectTapGestures(onDoubleTap = { onDoubleClick() })
-        }
-        .pointerInput(window) {
-            var grabX = 0f
-            var grabY = 0f
-            detectDragGestures(
-                onDragStart = { pos ->
-                    // 指针相对窗口左上角的偏移，拖拽过程中保持不变
-                    grabX = offsetInWindow.value.x + pos.x
-                    grabY = offsetInWindow.value.y + pos.y
-                },
-                onDrag = { change, _ ->
-                    change.consume()
-                    val screenX = window.x + offsetInWindow.value.x + change.position.x
-                    val screenY = window.y + offsetInWindow.value.y + change.position.y
-                    val (nx, ny) = clampToScreen(
-                        window,
-                        (screenX - grabX).toInt(),
-                        (screenY - grabY).toInt(),
-                    )
-                    window.setLocation(nx, ny)
-                },
-            )
-        }
+): Modifier = this
+    .pointerInput(window) {
+        detectTapGestures(onDoubleTap = { onDoubleClick() })
+    }
+    .pointerInput(window) {
+        var startPointerX = 0
+        var startPointerY = 0
+        var startWindowX = 0
+        var startWindowY = 0
+
+        detectDragGestures(
+            onDragStart = {
+                val p = java.awt.MouseInfo.getPointerInfo()?.location
+                if (p != null) {
+                    startPointerX = p.x
+                    startPointerY = p.y
+                }
+                startWindowX = window.x
+                startWindowY = window.y
+            },
+            onDrag = { change, _ ->
+                change.consume()
+                val p = java.awt.MouseInfo.getPointerInfo()?.location ?: return@detectDragGestures
+                val (nx, ny) = clampToScreen(
+                    window,
+                    startWindowX + (p.x - startPointerX),
+                    startWindowY + (p.y - startPointerY),
+                )
+                if (nx != window.x || ny != window.y) window.setLocation(nx, ny)
+            },
+        )
+    }
+
+/** jna-platform 的 User32 没暴露 ReleaseCapture，这里自行声明。 */
+private interface User32Extra : com.sun.jna.Library {
+    fun ReleaseCapture(): Boolean
+    fun SendMessage(
+        hWnd: com.sun.jna.platform.win32.WinDef.HWND,
+        msg: Int,
+        wParam: Long,
+        lParam: Long,
+    ): Long
+}
+
+private val user32Extra: User32Extra by lazy {
+    com.sun.jna.Native.load(
+        "user32",
+        User32Extra::class.java,
+        com.sun.jna.win32.W32APIOptions.DEFAULT_OPTIONS,
+    )
+}
+
+/** 让 Windows 接管标题栏拖拽（会阻塞当前线程直到拖拽结束，属预期行为）。 */
+private fun startNativeWindowDrag(window: java.awt.Window) {
+    runCatching {
+        val hwnd = com.sun.jna.platform.win32.WinDef.HWND(
+            com.sun.jna.Native.getWindowPointer(window),
+        )
+        user32Extra.ReleaseCapture()
+        user32Extra.SendMessage(hwnd, 0x00A1, 2L, 0L)
+    }.onFailure { appLog("原生拖拽失败: " + it.message) }
 }
 
 /** 保证窗口至少有一块留在某个屏幕内。 */

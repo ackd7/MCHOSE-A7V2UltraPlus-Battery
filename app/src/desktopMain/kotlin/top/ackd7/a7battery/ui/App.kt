@@ -946,8 +946,8 @@ private fun AboutOverlay(onClose: () -> Unit) {
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .widthIn(max = 460.dp)
+                .width(320.dp)
+                .fillMaxHeight(0.84f)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -963,7 +963,7 @@ private fun AboutOverlay(onClose: () -> Unit) {
                 )
                 .padding(20.dp),
         ) {
-            Text("A7 电量助手", fontSize = 18.sp, color = c.text)
+            Text(top.ackd7.a7battery.APP_NAME, fontSize = 16.sp, color = c.text)
             Spacer(Modifier.height(4.dp))
             Text("v$APP_VERSION", fontSize = 13.sp, color = c.secondary)
             Spacer(Modifier.height(16.dp))
@@ -973,7 +973,7 @@ private fun AboutOverlay(onClose: () -> Unit) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 300.dp)
+                    .weight(1f)
                     .verticalScroll(rememberScrollState()),
             ) {
                 RecentChanges.forEach { (ver, items) ->
@@ -991,7 +991,6 @@ private fun AboutOverlay(onClose: () -> Unit) {
                 }
             }
 
-            Spacer(Modifier.height(4.dp))
             MochiButtonRow(
                 text = "打开项目主页",
                 onClick = {
