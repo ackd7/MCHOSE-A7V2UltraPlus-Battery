@@ -996,7 +996,7 @@ private fun AboutOverlay(onClose: () -> Unit) {
                 onClick = {
                     runCatching {
                         java.awt.Desktop.getDesktop().browse(
-                            java.net.URI("https://github.com/ackd7/A7Battery"),
+                            java.net.URI("https://github.com/ackd7/MCHOSE-A7V2UltraPlus-Battery"),
                         )
                     }
                 },

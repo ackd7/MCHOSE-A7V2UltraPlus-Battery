@@ -50,7 +50,7 @@ class UpdateChecker {
     }
 
     companion object {
-        const val Repo = "ackd7/A7Battery"
+        const val Repo = "ackd7/MCHOSE-A7V2UltraPlus-Battery"
         private const val ApiUrl = "https://api.github.com/repos/$Repo/releases/latest"
         private const val LatestUrl = "https://github.com/$Repo/releases/latest"
 

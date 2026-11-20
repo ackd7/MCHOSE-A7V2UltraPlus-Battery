@@ -27,7 +27,7 @@ Unicode true
 !endif
 
 Name "${APP_NAME}"
-OutFile "${OUT_DIR}\MCHOSE-A7V2-Ultra-Battery-Setup-${APP_VERSION}.exe"
+OutFile "${OUT_DIR}\MCHOSE-A7V2UltraPlus-Battery-Setup-${APP_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\Programs\A7Battery"
 InstallDirRegKey HKCU "Software\A7Battery" "InstallDir"
 RequestExecutionLevel user
