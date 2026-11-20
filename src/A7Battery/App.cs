@@ -10,7 +10,7 @@ namespace A7Battery;
 
 public sealed partial class App : Application
 {
-    public const string AppVersion = "1.5.0";
+    public const string AppVersion = "1.6.0";
 
     private AppSettings _settings = null!;
     private BatteryMonitor _monitor = null!;
@@ -39,8 +39,8 @@ public sealed partial class App : Application
                 seed = ThemeService.ParseHex(_settings.StaticSeedColor);
                 ThemeSource = "预设 · " + _settings.StaticSeedColor;
             }
-            Theme.Apply(seed);
-            Log($"主题: mode={_settings.ThemeMode} source={ThemeSource} seed={ThemeService.ToHex(Theme.CurrentSeed)}");
+            Theme.Apply(seed, _settings.PaletteStyle);
+            Log($"主题: mode={_settings.ThemeMode} style={_settings.PaletteStyle} source={ThemeSource} seed={ThemeService.ToHex(Theme.CurrentSeed)}");
         }
         catch (Exception ex) { Log("主题应用失败: " + ex.Message); }
     }

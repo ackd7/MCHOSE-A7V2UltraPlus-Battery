@@ -17,8 +17,10 @@
 - **DPI 设置**：6 档 DPI 可视化编辑，选择当前档位一键写入鼠标板载配置；「读取当前」可回读设备现有档位值。
 - **回报率设置**：125 / 500 / 1000 / 2000 / 4000 / 8000 Hz 滑条档位，滑到哪档选哪档，写入后掉电不丢失（蓝牙固定 1K）。
 - **自动检查更新**：每天首次启动后台请求 GitHub Releases，发现新版本在窗口底部提示下载（可在设置中关闭）。
-- **自绘窗口**：无系统标题栏，界面内自绘最小化 / 最大化 / 关闭按钮，圆角窗口带阴影，顶栏可拖动。
+- **自绘窗口**：无系统标题栏，界面内自绘最小化 / 最大化 / 关闭按钮，Windows 11 原生系统圆角，顶栏可拖动；4K 高 DPI 下文字与矢量清晰（不用透明窗口位图缩放）。
 - **自选颜色**：静态取色色板含「+」自选入口，RGB 滑条或 HEX 输入自定义种子色。
+- **配色风格**：5 种 Material You 风格（TonalSpot / Vibrant / Expressive / Neutral / Monochrome），基于 Oklab 感知均匀色彩空间生成 tonal palette，比 HSL 色阶更协调。
+- **动效**：参考 mochi-compose 的 iOS 风格弹簧——卡片依次入场、按钮按压回弹、电量变化脉冲、主题切换反馈，并遵循系统「减少动态效果」设置。
 
 ## 支持设备
 
@@ -44,7 +46,7 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 
 从 [Releases](../../releases) 下载，有两种分发形式：
 
-- **安装包（推荐）**：`A7Battery-Setup-v1.5.0.exe` —— 双击安装，写入卸载注册表（在「设置 → 应用」/ 控制面板「程序和功能」中可正常卸载），可选创建桌面快捷方式与开机自启。安装到 `Program Files\A7Battery`，需要管理员权限。
+- **安装包（推荐）**：`A7Battery-Setup-v1.6.0.exe` —— 双击安装，写入卸载注册表（在「设置 → 应用」/ 控制面板「程序和功能」中可正常卸载），可选创建桌面快捷方式与开机自启。安装到 `Program Files\A7Battery`，需要管理员权限。
 - **便携解压版**：`A7Battery-win-x64.zip` —— 解压后运行 `A7Battery.exe`，免安装、免管理员权限。
 
 - 双击运行即显示主窗口；关闭窗口后程序继续在托盘运行，左键托盘图标可再次打开。
@@ -63,7 +65,7 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 - **静态取色**：从 8 套预设种子色（紫罗兰、海洋蓝、青碧、森林绿、琥珀橙、玫红、靛青、石墨）中选择，配色持久保存。
 - **动态取色（壁纸取色）**：直接读取当前桌面壁纸图像，采样并按色相分桶加权提取代表性主色作为种子色（Wallpaper Engine 等动态壁纸同样适用）。换壁纸后点「重新取色」即可让界面跟随，正是 dots-hyprland 的 wallpaper → palette 流程。若壁纸过于暗淡/单调无法提取，会回退到 Windows 系统强调色。
 
-两种模式都会从一个种子色生成整套 MD3 语义色板（Primary / Secondary / Tertiary / Container / Surface / Outline …），实时应用到窗口、内置控件与托盘图标。取色与色板生成都是 self-contained 实现（System.Drawing 采样 + HSL tonal 算法），无需额外依赖，切换即时生效。
+两种模式都会从一个种子色生成整套 MD3 语义色板（Primary / Secondary / Tertiary / Container / Surface / Outline …），实时应用到窗口、内置控件与托盘图标。色板生成基于 **Oklab 感知均匀色彩空间** 的 Tonal Palette，并支持 5 种配色风格（TonalSpot / Vibrant / Expressive / Neutral / Monochrome），效果接近 Google 的 HCT / Material You 方案；实现 self-contained，无需额外依赖。设计理念参考了 [MaterialKolor](https://github.com/jordond/MaterialKolor)，动效参考了 [mochi-compose](https://github.com/feice11/mochi-compose)。
 
 ## 从源码构建
 
@@ -113,7 +115,8 @@ A7Battery/
 │   ├── Services/
 │   │   ├── MchoseBatteryReader.cs # 电量协议解析
 │   │   ├── MouseConfigService.cs # DPI / 回报率读写协议
-│   │   ├── ThemeService.cs       # Material You 动态/静态取色（色板生成）
+│   │   ├── ThemeService.cs       # Material You 取色与配色风格
+│   │   ├── TonalPaletteService.cs # Oklab Tonal Palette + 色彩空间转换
 │   │   ├── WallpaperColorService.cs # 壁纸主色提取
 │   │   ├── UpdateChecker.cs      # GitHub Releases 更新检查
 │   │   ├── NativeTrayIcon.cs     # 原生托盘图标（Shell_NotifyIcon）
@@ -123,6 +126,8 @@ A7Battery/
 │   ├── MainWindow.xaml / .cs     # 主界面（WPF XAML，MD3 + 自绘圆角窗口）
 │   ├── ColorPickerWindow.xaml/.cs # 自选颜色对话框（RGB / HEX）
 │   ├── App.xaml / App.cs         # 全局 MD3 资源与生命周期入口
+│   ├── UiAnimations.cs           # 弹簧/入场/脉冲动效
+│   ├── WindowRounding.cs         # Windows 11 原生窗口圆角（4K 清晰）
 │   └── Assets/app.ico            # 应用图标
 ├── installer/A7Battery.iss       # Inno Setup 安装包脚本（卸载注册表）
 ├── tools/Probe/                  # HID 探测命令行工具

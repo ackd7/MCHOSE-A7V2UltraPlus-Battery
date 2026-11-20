@@ -19,6 +19,8 @@ public sealed partial class MainWindow : Window
     private UpdateInfo? _update;
     private int _activeDpiIndex = 2;
     private int _selectedRateIndex = 2;
+    private bool _styleComboInit;
+    private int _lastPercent = -1;
 
     private TextBox[] DpiBoxes => new[] { Dpi0, Dpi1, Dpi2, Dpi3, Dpi4, Dpi5 };
     private Border[] DpiChips => new[] { DpiChip0, DpiChip1, DpiChip2, DpiChip3, DpiChip4, DpiChip5 };
@@ -30,14 +32,15 @@ public sealed partial class MainWindow : Window
         _app = (App)Application.Current;
         InitializeComponent();
 
+        // 系统级圆角（不透明窗口，4K 下文字清晰；替代 AllowsTransparency 位图缩放）
+        SourceInitialized += (_, _) => WindowRounding.Apply(this);
+
         // 关闭按钮走自绘 ExitApp；系统级关闭（Alt+F4 等）仍隐藏到托盘
         Closing += (_, e) => { e.Cancel = true; Hide(); };
-        // 最大化时去掉圆角外框的留白，还原后恢复
+        // 最大化图标随窗口状态切换（圆角由系统 DWM 处理）
         StateChanged += (_, _) =>
         {
             bool max = WindowState == WindowState.Maximized;
-            WindowFrame.Margin = max ? new Thickness(0) : new Thickness(10);
-            WindowFrame.CornerRadius = max ? new CornerRadius(0) : new CornerRadius(18);
             MaximizeIcon.Kind = max
                 ? MaterialDesignThemes.Wpf.PackIconKind.WindowRestore
                 : MaterialDesignThemes.Wpf.PackIconKind.WindowMaximize;
@@ -45,6 +48,10 @@ public sealed partial class MainWindow : Window
 
         ApplySettings();
         _monitor.ReadingChanged += (_, info) => Dispatcher.Invoke(() => UpdateUI(info));
+
+        // 卡片依次淡入（MD3 Expressive 入场动效）
+        Loaded += (_, _) => UiAnimations.StaggerFadeIn(
+            BatteryCard, DeviceCard, SettingsCard, MouseCard, ThemeCard);
     }
 
     private static SolidColorBrush Brush(string hex) =>
@@ -93,6 +100,9 @@ public sealed partial class MainWindow : Window
         for (int i = 0; i < 6; i++) DpiBoxes[i].Text = _settings.DpiStages[i].ToString();
         _activeDpiIndex = _settings.ActiveDpiIndex;
         _selectedRateIndex = RateIndexFromHz(_settings.RateHz);
+        _styleComboInit = true;
+        PaletteStyleCombo.SelectedIndex = (int)_settings.PaletteStyle;
+        _styleComboInit = false;
         HighlightDpiStages();
         HighlightRate();
         UpdateActiveStageText();
@@ -211,28 +221,43 @@ public sealed partial class MainWindow : Window
 
     private void ThemeStatic_Click(object sender, RoutedEventArgs e)
     {
+        if (sender is Button b) UiAnimations.PressBounce(b);
         _settings.ThemeMode = ThemeMode.Static;
         _settings.Save();
         ApplyThemeAndRefresh(ThemeService.ParseHex(_settings.StaticSeedColor));
+        UiAnimations.GentlePulse(SwatchPrimary);
     }
 
     private void ThemeDynamic_Click(object sender, RoutedEventArgs e)
     {
+        if (sender is Button b) UiAnimations.PressBounce(b);
         _settings.ThemeMode = ThemeMode.Dynamic;
         _settings.Save();
         _app.ApplyTheme();
         AfterThemeApplied();
+        UiAnimations.GentlePulse(SwatchPrimary);
     }
 
     private void PresetColor_Click(object sender, RoutedEventArgs e)
     {
         if (sender is System.Windows.Controls.Button b && b.Tag is string hex)
         {
+            UiAnimations.PressBounce(b);
             _settings.StaticSeedColor = hex;
             _settings.ThemeMode = ThemeMode.Static;
             _settings.Save();
             ApplyThemeAndRefresh(ThemeService.ParseHex(hex));
+            UiAnimations.GentlePulse(SwatchPrimary);
         }
+    }
+
+    private void PaletteStyleCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_styleComboInit || PaletteStyleCombo.SelectedIndex < 0) return;
+        _settings.PaletteStyle = (PaletteStyle)PaletteStyleCombo.SelectedIndex;
+        _settings.Save();
+        _app.ApplyTheme();
+        AfterThemeApplied();
     }
 
     private void CustomColor_Click(object sender, RoutedEventArgs e)
@@ -317,7 +342,11 @@ public sealed partial class MainWindow : Window
         _settings.Save();
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e) => _monitor.Refresh();
+    private void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b) UiAnimations.PressBounce(b);
+        _monitor.Refresh();
+    }
 
     // ---------- 鼠标 DPI / 回报率 ----------
 
@@ -523,7 +552,10 @@ public sealed partial class MainWindow : Window
             var brush = info.Percent >= 50
                 ? Res("A7.Primary")
                 : Brush(info.Percent >= 20 ? "#FFC83D" : "#FF5C5C");
+            bool changed = _lastPercent >= 0 && _lastPercent != info.Percent;
             PercentText.Text = info.Percent.ToString();
+            _lastPercent = info.Percent;
+            if (changed) UiAnimations.GentlePulse(PercentText);
             PercentText.Foreground = brush;
             BatteryBar.Value = info.Percent;
             BatteryBar.Foreground = brush;

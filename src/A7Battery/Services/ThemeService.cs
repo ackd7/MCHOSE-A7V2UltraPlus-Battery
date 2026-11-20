@@ -47,61 +47,85 @@ namespace A7Battery.Services
 
         /// <summary>当前实际使用的种子色（供 UI 显示）。</summary>
         public Color CurrentSeed { get; private set; } = Color.FromRgb(0x67, 0x50, 0xA4);
+        public PaletteStyle CurrentStyle { get; private set; } = PaletteStyle.TonalSpot;
 
         /// <summary>应用一套种子色，生成并写入全部画刷。</summary>
-        public void Apply(Color seed)
+        public void Apply(Color seed, PaletteStyle style = PaletteStyle.TonalSpot)
         {
             CurrentSeed = seed;
+            CurrentStyle = style;
 
-            RgbToHsl(seed, out double h, out double s, out _);
+            var (_, seedChroma, seedHue) = Oklab.FromColor(seed);
+            // 保证种子彩度不至于过低（灰种子也能生成有区分度的色板）
+            double baseC = Math.Max(seedChroma, 0.045);
 
-            // 主色：把种子色规整到 MD3 常用的中等明度（tone≈40）
-            Color primary = Tone(h, s, 40);
-            Color secondary = Tone(h, Math.Max(0.18, s * 0.45), 40);
-            Color tertiary = Tone(h + 60, Math.Max(0.25, s * 0.7), 40);
+            // 参考 MaterialKolor / material-color-utilities 的各 PaletteStyle 派生规则
+            double secHueShift, secCScale, terHueShift, terCScale;
+            switch (style)
+            {
+                case PaletteStyle.Vibrant:
+                    secHueShift = 0; secCScale = 0.65; terHueShift = 240; terCScale = 0.55; break;
+                case PaletteStyle.Expressive:
+                    secHueShift = 120; secCScale = 0.45; terHueShift = 240; terCScale = 0.45; break;
+                case PaletteStyle.Neutral:
+                    secHueShift = 0; secCScale = 0.18; terHueShift = 0; terCScale = 0.28; break;
+                case PaletteStyle.Monochrome:
+                    secHueShift = 0; secCScale = 0.0; terHueShift = 0; terCScale = 0.0; break;
+                default: // TonalSpot
+                    secHueShift = 0; secCScale = 0.40; terHueShift = 60; terCScale = 0.67; break;
+            }
+
+            var primary = new TonalPalette(seedHue, baseC);
+            var secondary = new TonalPalette(seedHue + secHueShift, baseC * secCScale);
+            var tertiary = new TonalPalette(seedHue + terHueShift, baseC * terCScale);
+            var neutral = new TonalPalette(seedHue, baseC * 0.08);
+            var neutralVariant = new TonalPalette(seedHue, baseC * 0.16);
+            var error = new TonalPalette(25, 0.13);
 
             // 1) 更新 MaterialDesignThemes 内置控件画刷
             try
             {
                 Theme theme = _palette.GetTheme();
-                theme.PrimaryLight = new ColorPair(Tone(h, s, 80));
-                theme.PrimaryMid = new ColorPair(primary);
-                theme.PrimaryDark = new ColorPair(Tone(h, s, 25));
-                theme.SecondaryLight = new ColorPair(Tone(h, Math.Max(0.18, s * 0.45), 80));
-                theme.SecondaryMid = new ColorPair(secondary);
-                theme.SecondaryDark = new ColorPair(Tone(h, Math.Max(0.18, s * 0.45), 25));
+                theme.PrimaryLight = new ColorPair(primary.Tone(80));
+                theme.PrimaryMid = new ColorPair(primary.Tone(40));
+                theme.PrimaryDark = new ColorPair(primary.Tone(25));
+                theme.SecondaryLight = new ColorPair(secondary.Tone(80));
+                theme.SecondaryMid = new ColorPair(secondary.Tone(40));
+                theme.SecondaryDark = new ColorPair(secondary.Tone(25));
                 _palette.SetTheme(theme);
             }
             catch { /* 换肤失败不应影响主程序 */ }
 
-            // 2) 写入自定义 MD3 语义画刷（供 MainWindow.xaml 使用）
+            // 2) 写入自定义 MD3 语义画刷
             var r = Application.Current.Resources;
-            Set(r, "A7.Primary", primary);
-            Set(r, "A7.OnPrimary", Tone(h, s, 100));
-            Set(r, "A7.PrimaryContainer", Tone(h, s, 90));
-            Set(r, "A7.OnPrimaryContainer", Tone(h, s, 10));
+            Set(r, "A7.Primary", primary.Tone(40));
+            Set(r, "A7.OnPrimary", primary.Tone(100));
+            Set(r, "A7.PrimaryContainer", primary.Tone(90));
+            Set(r, "A7.OnPrimaryContainer", primary.Tone(10));
 
-            Set(r, "A7.Secondary", secondary);
-            Set(r, "A7.OnSecondary", Tone(h, Math.Max(0.18, s * 0.45), 100));
-            Set(r, "A7.SecondaryContainer", Tone(h, Math.Max(0.18, s * 0.45), 90));
-            Set(r, "A7.OnSecondaryContainer", Tone(h, Math.Max(0.18, s * 0.45), 10));
+            Set(r, "A7.Secondary", secondary.Tone(40));
+            Set(r, "A7.OnSecondary", secondary.Tone(100));
+            Set(r, "A7.SecondaryContainer", secondary.Tone(90));
+            Set(r, "A7.OnSecondaryContainer", secondary.Tone(10));
 
-            Set(r, "A7.Tertiary", tertiary);
-            Set(r, "A7.OnTertiary", Tone(h + 60, Math.Max(0.25, s * 0.7), 100));
+            Set(r, "A7.Tertiary", tertiary.Tone(40));
+            Set(r, "A7.OnTertiary", tertiary.Tone(100));
+            Set(r, "A7.TertiaryContainer", tertiary.Tone(90));
 
-            // 表面与背景：低彩度的中性色（MD3 的 surface 带一点主色相）
-            Set(r, "A7.Background", Tone(h, 0.04, 98));
-            Set(r, "A7.OnBackground", Tone(h, 0.04, 10));
-            Set(r, "A7.Surface", Tone(h, 0.04, 98));
-            Set(r, "A7.OnSurface", Tone(h, 0.04, 10));
-            Set(r, "A7.SurfaceVariant", Tone(h, Math.Max(0.08, s * 0.18), 90));
-            Set(r, "A7.OnSurfaceVariant", Tone(h, 0.10, 40));
-            Set(r, "A7.SurfaceContainer", Tone(h, 0.05, 94));
-            Set(r, "A7.SurfaceContainerLow", Tone(h, 0.04, 96));
-            Set(r, "A7.SurfaceContainerHigh", Tone(h, 0.05, 92));
-            Set(r, "A7.Divider", Tone(h, 0.06, 80));
-            Set(r, "A7.Outline", Tone(h, 0.08, 50));
-            Set(r, "A7.OutlineVariant", Tone(h, 0.06, 80));
+            // Surface 系列来自 neutral / neutralVariant（MD3 的 surface 带一点主色相）
+            Set(r, "A7.Background", neutral.Tone(98));
+            Set(r, "A7.OnBackground", neutral.Tone(10));
+            Set(r, "A7.Surface", neutral.Tone(98));
+            Set(r, "A7.OnSurface", neutral.Tone(10));
+            Set(r, "A7.SurfaceVariant", neutralVariant.Tone(90));
+            Set(r, "A7.OnSurfaceVariant", neutralVariant.Tone(30));
+            Set(r, "A7.SurfaceContainer", neutral.Tone(94));
+            Set(r, "A7.SurfaceContainerLow", neutral.Tone(96));
+            Set(r, "A7.SurfaceContainerHigh", neutral.Tone(92));
+            Set(r, "A7.Divider", neutralVariant.Tone(80));
+            Set(r, "A7.Outline", neutralVariant.Tone(50));
+            Set(r, "A7.OutlineVariant", neutralVariant.Tone(80));
+            Set(r, "A7.Error", error.Tone(40));
         }
 
         /// <summary>
@@ -165,64 +189,10 @@ namespace A7Battery.Services
 
         public static string ToHex(Color c) => $"#{c.R:X2}{c.G:X2}{c.B:X2}";
 
+        /// <summary>写入画刷。每次替换为新实例，避免冻结画刷无法修改的问题；主题的柔和不强调由 UI 层动画负责。</summary>
         private static void Set(ResourceDictionary dict, string key, Color color)
         {
             dict[key] = new SolidColorBrush(color);
-        }
-
-        /// <summary>
-        /// 按 HSL 生成一个「tone」色阶（0=黑, 100=白）。
-        /// 明度随 tone 线性变化，彩度在两端收敛——近似 Material 的 tonal palette，
-        /// 保证任意种子色都能得到协调的一套色阶，且完全 self-contained。
-        /// </summary>
-        private static Color Tone(double hue, double saturation, double tone)
-        {
-            hue = ((hue % 360) + 360) % 360;
-            saturation = Math.Clamp(saturation, 0.0, 1.0);
-            double t = Math.Clamp(tone, 0.0, 100.0) / 100.0;
-
-            // 饱和度在极暗/极亮处收敛，中间最强
-            double sat = saturation * (1.0 - Math.Abs(t - 0.4) * 0.75);
-            sat = Math.Clamp(sat, 0.0, 1.0);
-
-            return HslToRgb(hue, sat, t);
-        }
-
-        private static void RgbToHsl(Color c, out double h, out double s, out double l)
-        {
-            double r = c.R / 255.0, g = c.G / 255.0, b = c.B / 255.0;
-            double max = Math.Max(r, Math.Max(g, b));
-            double min = Math.Min(r, Math.Min(g, b));
-            double d = max - min;
-            l = (max + min) / 2.0;
-            if (d < 1e-6) { h = 0; s = 0; return; }
-            s = d / (1 - Math.Abs(2 * l - 1));
-            if (max == r) h = 60 * (((g - b) / d) % 6);
-            else if (max == g) h = 60 * ((b - r) / d + 2);
-            else h = 60 * ((r - g) / d + 4);
-            if (h < 0) h += 360;
-        }
-
-        private static Color HslToRgb(double h, double s, double l)
-        {
-            double c = (1 - Math.Abs(2 * l - 1)) * s;
-            double x = c * (1 - Math.Abs((h / 60.0) % 2 - 1));
-            double m = l - c / 2;
-            double r, g, b;
-            int sector = (int)(h / 60) % 6;
-            switch (sector)
-            {
-                case 0: r = c; g = x; b = 0; break;
-                case 1: r = x; g = c; b = 0; break;
-                case 2: r = 0; g = c; b = x; break;
-                case 3: r = 0; g = x; b = c; break;
-                case 4: r = x; g = 0; b = c; break;
-                default: r = c; g = 0; b = x; break;
-            }
-            return Color.FromRgb(
-                (byte)Math.Round((r + m) * 255),
-                (byte)Math.Round((g + m) * 255),
-                (byte)Math.Round((b + m) * 255));
         }
     }
 }

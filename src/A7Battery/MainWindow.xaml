@@ -6,9 +6,12 @@
         MinHeight="560" MinWidth="410"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        AllowsTransparency="True"
         ResizeMode="CanResize"
-        Background="Transparent"
+        Background="{DynamicResource A7.Background}"
+        RenderOptions.BitmapScalingMode="HighQuality"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True"
         FontFamily="Roboto, Microsoft YaHei UI"
         TextElement.Foreground="{DynamicResource A7.OnSurface}"
         TextElement.FontWeight="Regular"
@@ -111,11 +114,8 @@
                       UseAeroCaptionButtons="False" CornerRadius="0" GlassFrameThickness="0"/>
     </WindowChrome.WindowChrome>
 
-    <!-- 圆角外框 + 阴影（自绘窗口） -->
-    <Border x:Name="WindowFrame" Margin="10" CornerRadius="18" Background="{DynamicResource A7.Background}" SnapsToDevicePixels="True">
-        <Border.Effect>
-            <DropShadowEffect Color="#1F2937" BlurRadius="18" ShadowDepth="3" Opacity="0.22"/>
-        </Border.Effect>
+    <!-- 内容外框：窗口圆角由 Windows 11 DWM 原生处理（见 App 中的 DwmSetWindowAttribute），保证 4K 清晰 -->
+    <Border x:Name="WindowFrame" Background="{DynamicResource A7.Background}" SnapsToDevicePixels="True">
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -123,7 +123,7 @@
             </Grid.RowDefinitions>
 
             <!-- 顶栏 (自绘标题栏，可拖动) -->
-            <Border x:Name="TitleBar" Grid.Row="0" Height="52" CornerRadius="18,18,0,0"
+            <Border x:Name="TitleBar" Grid.Row="0" Height="52"
                     Background="{DynamicResource A7.Surface}"
                     BorderBrush="{DynamicResource A7.Divider}" BorderThickness="0,0,0,1"
                     MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
@@ -157,7 +157,7 @@
             <StackPanel Margin="16,16,16,24">
 
                 <!-- 主电量卡片 -->
-                <materialDesign:Card UniformCornerRadius="20" Padding="20" Margin="0,0,0,12">
+                <materialDesign:Card x:Name="BatteryCard" UniformCornerRadius="24" Padding="20" Margin="0,0,0,12">
                     <StackPanel>
                         <Grid>
                             <StackPanel Orientation="Horizontal">
@@ -217,7 +217,7 @@
                 </materialDesign:Card>
 
                 <!-- 设备信息卡片 -->
-                <materialDesign:Card UniformCornerRadius="20" Padding="20" Margin="0,0,0,12">
+                <materialDesign:Card x:Name="DeviceCard" UniformCornerRadius="24" Padding="20" Margin="0,0,0,12">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <materialDesign:PackIcon Kind="InformationOutline" Width="17" Height="17"
@@ -246,7 +246,7 @@
                 </materialDesign:Card>
 
                 <!-- 设置卡片 -->
-                <materialDesign:Card UniformCornerRadius="20" Padding="20" Margin="0,0,0,12">
+                <materialDesign:Card x:Name="SettingsCard" UniformCornerRadius="24" Padding="20" Margin="0,0,0,12">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <materialDesign:PackIcon Kind="SettingsOutline" Width="17" Height="17"
@@ -306,7 +306,7 @@
                 </materialDesign:Card>
 
                 <!-- 鼠标设置卡片 -->
-                <materialDesign:Card UniformCornerRadius="20" Padding="20" Margin="0,0,0,12">
+                <materialDesign:Card x:Name="MouseCard" UniformCornerRadius="24" Padding="20" Margin="0,0,0,12">
                     <StackPanel>
                         <Grid Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal">
@@ -417,7 +417,7 @@
                 </materialDesign:Card>
 
                 <!-- 主题取色卡片 -->
-                <materialDesign:Card UniformCornerRadius="20" Padding="20" Margin="0,0,0,12">
+                <materialDesign:Card x:Name="ThemeCard" UniformCornerRadius="24" Padding="20" Margin="0,0,0,12">
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                             <materialDesign:PackIcon Kind="Palette" Width="17" Height="17"
@@ -447,6 +447,20 @@
                             <TextBlock Text="预设种子色" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,0,0,8"/>
                             <WrapPanel x:Name="PresetSwatches" Margin="0,0,0,6"/>
                         </StackPanel>
+
+                        <!-- 配色风格（MaterialKolor PaletteStyle） -->
+                        <Grid Margin="0,4,0,10">
+                            <TextBlock Text="配色风格" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}"
+                                       VerticalAlignment="Center"/>
+                            <ComboBox x:Name="PaletteStyleCombo" Width="130" HorizontalAlignment="Right"
+                                      SelectionChanged="PaletteStyleCombo_SelectionChanged">
+                                <ComboBoxItem Content="柔和 TonalSpot" Tag="0"/>
+                                <ComboBoxItem Content="鲜艳 Vibrant" Tag="1"/>
+                                <ComboBoxItem Content="表现 Expressive" Tag="2"/>
+                                <ComboBoxItem Content="中性 Neutral" Tag="3"/>
+                                <ComboBoxItem Content="单色 Monochrome" Tag="4"/>
+                            </ComboBox>
+                        </Grid>
 
                         <!-- 动态：系统强调色 -->
                         <StackPanel x:Name="DynamicPalettePanel" Visibility="Collapsed">

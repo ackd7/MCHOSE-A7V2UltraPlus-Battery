@@ -14,6 +14,7 @@ namespace A7Battery.Services
         // 主题取色
         public ThemeMode ThemeMode { get; set; } = ThemeMode.Static;
         public string StaticSeedColor { get; set; } = "#6750A4";
+        public PaletteStyle PaletteStyle { get; set; } = PaletteStyle.TonalSpot;
 
         // 自动更新检查
         public bool CheckUpdates { get; set; } = true;

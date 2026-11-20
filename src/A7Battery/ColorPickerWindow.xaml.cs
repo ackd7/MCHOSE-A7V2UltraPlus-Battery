@@ -15,6 +15,7 @@ public sealed partial class ColorPickerWindow : Window
     public ColorPickerWindow(Color initial)
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => WindowRounding.Apply(this);
         ResultColor = initial;
         _suppress = true;
         RSlider.Value = initial.R;
