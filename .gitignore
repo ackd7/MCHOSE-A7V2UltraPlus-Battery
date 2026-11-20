@@ -1,20 +1,20 @@
 ## 构建输出
-bin/
-obj/
+.gradle/
+build/
+app/build/
 dist/
 publish/
-*.user
-*.suo
-.vs/
 
-## SDK 下载缓存
-*.zip
-.dotnet/
-
-## Python
-__pycache__/
-*.pyc
-
-## 编辑器
+## IDE / 编辑器
 .vscode/
 .idea/
+*.iml
+
+## Kotlin
+*.class
+*.log
+.kotlin/
+
+## 其他
+.DS_Store
+Thumbs.db

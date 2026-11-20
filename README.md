@@ -1,8 +1,10 @@
 # A7 Battery
 
-一个基于 **WPF**（.NET 8）的 Windows 托盘小工具，采用 **Material Design 3** 界面，用于查看 **迈从 MCHOSE A7 V2 Ultra+** 无线鼠标的精确电量。
+一个基于 **Compose Multiplatform (Kotlin) + miuix** 的 Windows 托盘小工具，用于查看 **迈从 MCHOSE A7 V2 Ultra+** 无线鼠标的精确电量。
 
-左键点击任务栏托盘图标即可快速查看电量，支持开机自启、可调刷新间隔，还能直接调整鼠标 DPI 与回报率、自动检查新版本。
+左键点击任务栏托盘图标即可快速查看电量，支持开机自启、可调刷新间隔，还能直接调整鼠标 DPI 与回报率、自动检查新版本。界面采用 [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix) 的 MIUI/HyperOS 设计语言（`lightColorScheme` / `darkColorScheme`，主色 `#3482FF`）。
+
+> 本仓库 v2.0 起从 WPF + Material Design 3 迁移至 Compose Desktop + miuix：去除了所有 WPF/MD3 与动态取色代码，仅保留 HID 协议、托盘、设置等核心业务逻辑，并用 Kotlin 重写。
 
 ## 功能
 
@@ -15,14 +17,9 @@
 - **刷新间隔**：15s / 30s / 90s 可选，设置持久化保存。
 - **休眠处理**：鼠标休眠时保留最后一次读数并提示，不会误报 0%。
 - **DPI 设置**：6 档 DPI 可视化编辑，选择当前档位一键写入鼠标板载配置；「读取当前」可回读设备现有档位值。
-- **回报率设置**：125 / 500 / 1000 / 2000 / 4000 / 8000 Hz 滑条档位，滑到哪档选哪档，写入后掉电不丢失（蓝牙固定 1K）。
-- **自动检查更新**：每天首次启动后台请求 GitHub Releases，发现新版本在窗口底部提示下载（可在设置中关闭）。
-- **miuix 风格界面**：照搬 [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix) 的 lightColorScheme 设计 token（主色 `#3482FF`、蓝调灰次要文字 `#8C93B0`、16dp 圆角、规整的字号层级）。
-- **关闭后后台继续运行**：关闭窗口（自绘 X / Alt+F4）只隐藏到托盘，电量监控与托盘持续工作；完全退出请用托盘右键「退出」。
-- **自绘窗口**：无系统标题栏，界面内自绘最小化 / 最大化 / 关闭按钮，Windows 11 原生系统圆角，顶栏可拖动；4K 高 DPI 下文字与矢量清晰（不用透明窗口位图缩放）。
-- **自选颜色**：静态取色色板含「+」自选入口，RGB 滑条或 HEX 输入自定义种子色。
-- **配色风格**：5 种 Material You 风格（TonalSpot / Vibrant / Expressive / Neutral / Monochrome），基于 Oklab 感知均匀色彩空间生成 tonal palette，比 HSL 色阶更协调。
-- **动效**：参考 mochi-compose 的 iOS 风格弹簧——卡片依次入场、按钮按压回弹、电量变化脉冲、主题切换反馈，并遵循系统「减少动态效果」设置。
+- **回报率设置**：125 / 500 / 1000 / 2000 / 4000 / 8000 Hz 滑条档位，写入后掉电不丢失（蓝牙固定 1K）。
+- **自动检查更新**：每天首次启动后台请求 GitHub Releases，发现新版本在界面提示下载（可在设置中关闭）。
+- **miuix 风格界面**：直接使用 miuix 的 `MiuixTheme`（`lightColorScheme` / `darkColorScheme`），主色 `#3482FF`、次要文字 `#8C93B0`，跟随系统浅色/深色模式。
 
 ## 支持设备
 
@@ -48,96 +45,71 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 
 从 [Releases](../../releases) 下载，有两种分发形式：
 
-- **安装包（推荐）**：`A7Battery-Setup-v1.7.0.exe` —— 双击安装，写入卸载注册表（在「设置 → 应用」/ 控制面板「程序和功能」中可正常卸载），可选创建桌面快捷方式与开机自启。安装到 `Program Files\A7Battery`，需要管理员权限。
-- **便携解压版**：`A7Battery-win-x64.zip` —— 解压后运行 `A7Battery.exe`，免安装、免管理员权限。
+- **安装包（推荐）**：`A7Battery-2.0.0.msi` —— 双击安装（MSI 向导）。
+- **便携解压版**：`A7Battery-2.0.0.exe`（或对应 zip）—— 免安装运行。
 
 - 双击运行即显示主窗口；关闭窗口后程序继续在托盘运行，左键托盘图标可再次打开。
 - 右键托盘图标 → 「退出」可完全退出程序。
-- 无需厂商驱动、**无需任何额外运行时**（自包含 .NET 8 + WPF + Material Design 3）。
+- 无需厂商驱动、**无需额外运行时**（Compose Desktop 打包自带 JRE）。
 - 需要 Windows 10 1903+ / Windows 11 x64。
-
-## 界面
-
-采用 Material Design 3（通过 [MaterialDesignInXAML](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit) 5.x 的 MD3 主题），卡片 / 开关 / 按钮 / 进度条均为 MD3 风格。电量数字按高低变色（高=主题主色、中=琥珀、低=红），充电时显示闪电图标。
-
-### 动态 / 静态取色（Material You）
-
-参考 [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) 的 Material You 配色理念，界面提供两种取色模式：
-
-- **静态取色**：从 8 套预设种子色（紫罗兰、海洋蓝、青碧、森林绿、琥珀橙、玫红、靛青、石墨）中选择，配色持久保存。
-- **动态取色（壁纸取色）**：直接读取当前桌面壁纸图像，采样并按色相分桶加权提取代表性主色作为种子色（Wallpaper Engine 等动态壁纸同样适用）。换壁纸后点「重新取色」即可让界面跟随，正是 dots-hyprland 的 wallpaper → palette 流程。若壁纸过于暗淡/单调无法提取，会回退到 Windows 系统强调色。
-
-两种模式都会从一个种子色生成整套 MD3 语义色板（Primary / Secondary / Tertiary / Container / Surface / Outline …），实时应用到窗口、内置控件与托盘图标。色板生成基于 **Oklab 感知均匀色彩空间** 的 Tonal Palette，并支持 5 种配色风格（TonalSpot / Vibrant / Expressive / Neutral / Monochrome），效果接近 Google 的 HCT / Material You 方案；实现 self-contained，无需额外依赖。设计理念参考了 [MaterialKolor](https://github.com/jordond/MaterialKolor)，动效参考了 [mochi-compose](https://github.com/feice11/mochi-compose)。
 
 ## 从源码构建
 
-需要 .NET 8 SDK（无需 Visual Studio、无需 Windows SDK）。
-
-WPF 的 XAML 编译器内置于 .NET SDK，因此普通 `dotnet build` 即可完成全部编译，不依赖 Visual Studio 或任何外部工具，也没有 PRI / WindowsAppSDK 运行时等部署要求。
+需要 **JDK 17+**（无需预装 Gradle，`gradlew` 会自动下载 Gradle 9.9.2）。
 
 ```powershell
-# 调试构建（框架依赖，需本机已装 .NET 8 桌面运行时）
-dotnet build src/A7Battery/A7Battery.csproj -c Debug -p:Platform=x64
+# 构建
+.\gradlew.bat :app:build
 
-# 发布构建（自包含 .NET 8 + WPF + MD3，可直接分发）
-dotnet build src/A7Battery/A7Battery.csproj -c Release -p:Platform=x64
-# 产物：src/A7Battery/bin/x64/Release/net8.0-windows/win-x64/
+# 打包桌面分发（MSI + EXE）
+.\gradlew.bat :app:packageDistributionForCurrentOS
+# 产物：app/build/compose/binaries/
 ```
 
-## 制作安装包
-
-使用 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 生成带卸载注册表的安装程序：
-
-```powershell
-# 先构建 Release，再编译安装脚本
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\A7Battery.iss
-# 产物：dist\installer\A7Battery-Setup-v1.2.0.exe
-```
-
-安装脚本位于 `installer/A7Battery.iss`，包含：
-- 卸载注册表项（HKLM Uninstall，可在「程序和功能」中卸载）
-- 开始菜单快捷方式 + 卸载入口；可选桌面快捷方式
-- 可选开机自启（写 HKCU `...\Run`，与程序内设置一致）
-- 安装前自动结束正在运行的旧实例
-
-## 电量探测工具
-
-`tools/Probe` 是命令行工具，用于验证协议和查看原始 HID 报告：
-
-```powershell
-dotnet run --project tools/Probe/Probe.csproj
-```
+也可以使用仓库根目录的 `build.ps1` 一键构建 + 打包。
 
 ## 目录结构
 
 ```
 A7Battery/
-├── src/A7Battery/                # WPF 应用（.NET 8）
-│   ├── Interop/HidNative.cs      # HID 设备枚举与 Feature 读写（P/Invoke）
-│   ├── Services/
-│   │   ├── MchoseBatteryReader.cs # 电量协议解析
-│   │   ├── MouseConfigService.cs # DPI / 回报率读写协议
-│   │   ├── ThemeService.cs       # Material You 取色与配色风格
-│   │   ├── TonalPaletteService.cs # Oklab Tonal Palette + 色彩空间转换
-│   │   ├── WallpaperColorService.cs # 壁纸主色提取
-│   │   ├── UpdateChecker.cs      # GitHub Releases 更新检查
-│   │   ├── NativeTrayIcon.cs     # 原生托盘图标（Shell_NotifyIcon）
-│   │   ├── BatteryMonitor.cs     # 轮询调度（DispatcherTimer）
-│   │   ├── AppSettings.cs        # 设置持久化
-│   │   └── Autostart.cs          # 开机自启（注册表）
-│   ├── MainWindow.xaml / .cs     # 主界面（WPF XAML，MD3 + 自绘圆角窗口）
-│   ├── ColorPickerWindow.xaml/.cs # 自选颜色对话框（RGB / HEX）
-│   ├── App.xaml / App.cs         # 全局 MD3 资源与生命周期入口
-│   ├── UiAnimations.cs           # 弹簧/入场/脉冲动效
-│   ├── WindowRounding.cs         # Windows 11 原生窗口圆角（4K 清晰）
-│   └── Assets/app.ico            # 应用图标
-├── installer/A7Battery.iss       # Inno Setup 安装包脚本（卸载注册表）
-├── tools/Probe/                  # HID 探测命令行工具
-└── tools/make_icon.py            # 图标生成脚本
+├── app/                                   # Compose Desktop 应用
+│   ├── build.gradle.kts                   # KMP + Compose Desktop + miuix 依赖
+│   └── src/desktopMain/
+│       ├── kotlin/top/ackd7/a7battery/
+│       │   ├── Main.kt                    # 应用入口 + 托盘/监控编排
+│       │   ├── interop/
+│       │   │   └── HidNative.kt           # HID 枚举与 Feature 读写（JNA）
+│       │   ├── services/
+│       │   │   ├── MchoseBatteryReader.kt # 电量协议解析
+│       │   │   ├── MouseConfigService.kt  # DPI / 回报率读写协议
+│       │   │   ├── BatteryMonitor.kt      # 轮询调度（协程）
+│       │   │   ├── NativeTrayIcon.kt      # 原生托盘（Shell_NotifyIcon / JNA）
+│       │   │   ├── AppSettings.kt         # 设置持久化（JSON）
+│       │   │   ├── Autostart.kt           # 开机自启（注册表 / JNA）
+│       │   │   └── UpdateChecker.kt       # GitHub Releases 更新检查
+│       │   └── ui/
+│       │       ├── Theme.kt               # miuix 主题封装
+│       │       └── App.kt                 # 主界面（miuix 组件）
+│       └── resources/app.ico              # 应用图标
+├── gradle/libs.versions.toml              # 版本目录
+├── gradlew / gradlew.bat                  # Gradle Wrapper
+├── build.ps1                              # 一键构建脚本
+└── LICENSE
 ```
+
+## 技术栈迁移说明
+
+| 原 WPF 版 (v1.x) | 现 Compose 版 (v2.0) |
+| --- | --- |
+| .NET 8 + WPF + XAML | Kotlin + Compose Multiplatform |
+| Material Design 3 (MaterialDesignInXAML) | miuix（MIUI/HyperOS 设计语言） |
+| P/Invoke (hid.dll / setupapi) | JNA (hid.dll / setupapi) |
+| DispatcherTimer 轮询 | Kotlin 协程轮询 |
+| 自绘窗口 + 系统圆角 | miuix-window |
+| 动态取色（Oklab / Material You） | miuix 内建 Monet / 主题 token |
 
 ## 许可
 
 MIT License. 详见 [LICENSE](LICENSE)。
 
-本项目电量协议参考了 [sdparklab/Voltide](https://github.com/sdparklab/Voltide)（MIT License）的逆向成果，DPI / 回报率协议参考了 [icepie/mchose-linux](https://github.com/icepie/mchose-linux) 的逆向文档，特此致谢。
+本项目电量协议参考了 [sdparklab/Voltide](https://github.com/sdparklab/Voltide)（MIT License）的逆向成果，DPI / 回报率协议参考了 [icepie/mchose-linux](https://github.com/icepie/mchose-linux) 的逆向文档，UI 使用 [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix)（Apache-2.0），特此致谢。
