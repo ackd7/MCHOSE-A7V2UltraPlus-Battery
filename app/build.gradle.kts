@@ -11,7 +11,7 @@ plugins {
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突
 val appVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "2.0.6"
+    ?: "2.0.7"
 
 kotlin {
     jvm("desktop")
@@ -42,6 +42,8 @@ kotlin {
             implementation(compose.desktop.currentOs)
             implementation(libs.jna)
             implementation(libs.jna.platform)
+            // 提供 Dispatchers.Main（Swing/EDT）
+            implementation(libs.kotlinx.coroutines.swing)
         }
     }
 }

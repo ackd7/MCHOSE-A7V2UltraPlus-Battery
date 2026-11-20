@@ -28,6 +28,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
@@ -39,7 +40,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -340,6 +340,9 @@ private fun formatTime(epochMs: Long): String = runCatching {
 @Composable
 private fun MousePage(settings: AppSettings, wide: Boolean) {
     val mouse = remember { MouseConfigService() }
+    // 组合作用域：在其上 launch，协程体默认回到 UI 线程
+    // （Compose Desktop 默认没有 Dispatchers.Main，直接用会抛 IllegalStateException）
+    val scope = rememberCoroutineScope()
     val dpiText = remember {
         mutableStateListOf(*settings.dpiStages.map { it.toString() }.toTypedArray())
     }
@@ -352,25 +355,23 @@ private fun MousePage(settings: AppSettings, wide: Boolean) {
         if (busy) return
         busy = true
         status = "正在读取…"
-        CoroutineScope(Dispatchers.IO).launch {
-            val cfg = mouse.read()
-            withContext(Dispatchers.Main) {
-                busy = false
-                if (cfg.success) {
-                    for (i in 0 until 6) dpiText[i] = cfg.dpiStages[i].toString()
-                    if (cfg.activeDpiIndex in 0..5) activeDpiIndex = cfg.activeDpiIndex
-                    val hz = when {
-                        cfg.usbRateIndex in MouseConfigService.RateHz.indices ->
-                            MouseConfigService.RateHz[cfg.usbRateIndex]
-                        cfg.wirelessRateIndex in MouseConfigService.RateHz.indices ->
-                            MouseConfigService.RateHz[cfg.wirelessRateIndex]
-                        else -> -1
-                    }
-                    if (hz > 0) rateIndex = rateIndexFromHz(hz)
-                    status = "已读取：当前档位 ${activeDpiIndex + 1} · ${MouseConfigService.RateHz[rateIndex]} Hz"
-                } else {
-                    status = "读取失败：${cfg.error}"
+        scope.launch {
+            val cfg = withContext(Dispatchers.IO) { mouse.read() }
+            busy = false
+            if (cfg.success) {
+                for (i in 0 until 6) dpiText[i] = cfg.dpiStages[i].toString()
+                if (cfg.activeDpiIndex in 0..5) activeDpiIndex = cfg.activeDpiIndex
+                val hz = when {
+                    cfg.usbRateIndex in MouseConfigService.RateHz.indices ->
+                        MouseConfigService.RateHz[cfg.usbRateIndex]
+                    cfg.wirelessRateIndex in MouseConfigService.RateHz.indices ->
+                        MouseConfigService.RateHz[cfg.wirelessRateIndex]
+                    else -> -1
                 }
+                if (hz > 0) rateIndex = rateIndexFromHz(hz)
+                status = "已读取：当前档位 ${activeDpiIndex + 1} · ${MouseConfigService.RateHz[rateIndex]} Hz"
+            } else {
+                status = "读取失败：${cfg.error}"
             }
         }
     }
@@ -388,18 +389,16 @@ private fun MousePage(settings: AppSettings, wide: Boolean) {
         }
         busy = true
         status = "正在写入 DPI…"
-        CoroutineScope(Dispatchers.IO).launch {
-            val (ok, err) = mouse.setDpi(values, activeDpiIndex)
-            withContext(Dispatchers.Main) {
-                busy = false
-                if (ok) {
-                    settings.dpiStages = values
-                    settings.activeDpiIndex = activeDpiIndex
-                    settings.save()
-                    status = "DPI 已写入：档位 ${activeDpiIndex + 1} = ${values[activeDpiIndex]}"
-                } else {
-                    status = "DPI 写入失败：$err"
-                }
+        scope.launch {
+            val (ok, err) = withContext(Dispatchers.IO) { mouse.setDpi(values, activeDpiIndex) }
+            busy = false
+            if (ok) {
+                settings.dpiStages = values
+                settings.activeDpiIndex = activeDpiIndex
+                settings.save()
+                status = "DPI 已写入：档位 ${activeDpiIndex + 1} = ${values[activeDpiIndex]}"
+            } else {
+                status = "DPI 写入失败：$err"
             }
         }
     }
@@ -408,17 +407,15 @@ private fun MousePage(settings: AppSettings, wide: Boolean) {
         if (busy) return
         busy = true
         status = "正在写入回报率…"
-        CoroutineScope(Dispatchers.IO).launch {
-            val (ok, err) = mouse.setRate(rateIndex)
-            withContext(Dispatchers.Main) {
-                busy = false
-                if (ok) {
-                    settings.rateHz = MouseConfigService.RateHz[rateIndex]
-                    settings.save()
-                    status = "回报率已写入：${MouseConfigService.RateHz[rateIndex]} Hz"
-                } else {
-                    status = "回报率写入失败：$err"
-                }
+        scope.launch {
+            val (ok, err) = withContext(Dispatchers.IO) { mouse.setRate(rateIndex) }
+            busy = false
+            if (ok) {
+                settings.rateHz = MouseConfigService.RateHz[rateIndex]
+                settings.save()
+                status = "回报率已写入：${MouseConfigService.RateHz[rateIndex]} Hz"
+            } else {
+                status = "回报率写入失败：$err"
             }
         }
     }

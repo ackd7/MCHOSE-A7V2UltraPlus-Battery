@@ -53,7 +53,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.6"
+const val APP_VERSION = "2.0.7"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -64,7 +64,35 @@ internal fun appLog(msg: String) {
     }
 }
 
+/** 把 stdout/stderr 也写进 app.log —— 打包后的程序是 WinExe，控制台输出否则完全看不到。 */
+private fun installStdStreamTee() {
+    runCatching {
+        val tee = java.io.PrintStream(
+            object : java.io.OutputStream() {
+                private val line = StringBuilder()
+                override fun write(b: Int) {
+                    if (b == '\n'.code) {
+                        if (line.isNotBlank()) appLog("OUT: $line")
+                        line.setLength(0)
+                    } else {
+                        line.append(b.toChar())
+                        if (line.length > 4000) {
+                            appLog("OUT: $line")
+                            line.setLength(0)
+                        }
+                    }
+                }
+            },
+            true,
+            "UTF-8",
+        )
+        System.setErr(tee)
+        System.setOut(tee)
+    }
+}
+
 fun main(args: Array<String>) {
+    installStdStreamTee()
     Thread.setDefaultUncaughtExceptionHandler { t, e ->
         appLog("UNCAUGHT in ${t.name}: ${e.stackTraceToString()}")
     }
@@ -162,7 +190,6 @@ fun main(args: Array<String>) {
             onCloseRequest = { isVisible = false },
             title = "A7 电量助手",
             state = windowState,
-            visible = isVisible,
             undecorated = true,
         ) {
             val win = window
@@ -190,6 +217,38 @@ fun main(args: Array<String>) {
                 })
             }
 
+            // 开发用：用 Robot 点击标题栏空白处（标题右侧、按钮左侧），复现「点空白就消失」
+            LaunchedEffect(Unit) {
+                if (args.contains("--test-titlebar")) {
+                    kotlinx.coroutines.delay(3000)
+                    runCatching {
+                        val b = win.bounds
+                        val robot = java.awt.Robot()
+                        // 标题栏同一行、按钮左侧的空白区域，横向点三处
+                        val offsets = intArrayOf(-420, -300, -180)
+                        for (dx in offsets) {
+                            val x = b.x + b.width + dx
+                            val y = b.y + 24
+                            robot.mouseMove(x, y)
+                            Thread.sleep(150)
+                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(90)
+                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(600)
+                            appLog(
+                                "测试：点击($x,$y) 后 visible=${win.isVisible} " +
+                                    "state=${win.extendedState} maximized=" +
+                                    ((win.extendedState and java.awt.Frame.MAXIMIZED_BOTH) != 0),
+                            )
+                        }
+                        val img = java.awt.Robot().createScreenCapture(win.bounds)
+                        val out = java.io.File(System.getProperty("java.io.tmpdir"), "a7-titlebar.png")
+                        javax.imageio.ImageIO.write(img, "png", out)
+                        appLog("测试：点击后截图 = " + out.absolutePath)
+                    }.onFailure { appLog("测试失败: " + it.message) }
+                }
+            }
+
             // 开发用：连续切换最大化 4 次，验证不会出现异常最小化
             LaunchedEffect(Unit) {
                 if (args.contains("--test-max")) {
@@ -215,6 +274,16 @@ fun main(args: Array<String>) {
                     appLog("测试：模拟点击托盘打开")
                     isVisible = true
                     showToken++
+                }
+            }
+
+            // 显隐：只在这里改 AWT 状态，避免 Compose 的 visible 参数与手动操作互相打架
+            LaunchedEffect(isVisible) {
+                if (isVisible) {
+                    win.isVisible = true
+                } else {
+                    win.isVisible = false
+                    appLog("窗口已隐藏")
                 }
             }
 
@@ -417,15 +486,15 @@ private fun WindowButton(
 
     Box(
         modifier = Modifier
-            .padding(horizontal = 2.dp)
-            .size(34.dp)
+            .padding(horizontal = 5.dp)
+            .size(28.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(12.dp)) {
+        Canvas(modifier = Modifier.size(11.dp)) {
             draw(stroke)
         }
     }

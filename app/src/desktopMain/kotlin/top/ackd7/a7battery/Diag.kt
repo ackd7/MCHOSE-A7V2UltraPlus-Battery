@@ -9,6 +9,15 @@ import top.ackd7.a7battery.services.MouseConfigService
  * 用法：./gradlew.bat :app:diag
  */
 fun main() {
+    println("=== Dispatchers.Main 可用性 ===")
+    val mainOk = runCatching {
+        kotlinx.coroutines.runBlocking {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { }
+        }
+        true
+    }.getOrElse { false }
+    println("Dispatchers.Main = ${if (mainOk) "可用" else "缺失（会抛 IllegalStateException）"}")
+
     println("=== HID 设备枚举 ===")
     val all = HidNative.enumerate()
     println("共 ${all.size} 个 HID 接口")
