@@ -49,6 +49,11 @@ class NativeTrayIcon : AutoCloseable {
         SystemTray.getSystemTray().add(trayIcon)
     }
 
+    /** 托盘气泡通知（低电量提醒等）。 */
+    fun notify(title: String, text: String) {
+        runCatching { trayIcon.displayMessage(title, text, TrayIcon.MessageType.WARNING) }
+    }
+
     fun setIcon(percent: Int?, charging: Boolean, tip: String) {
         trayIcon.image = createIcon(percent, charging)
         trayIcon.toolTip = tip

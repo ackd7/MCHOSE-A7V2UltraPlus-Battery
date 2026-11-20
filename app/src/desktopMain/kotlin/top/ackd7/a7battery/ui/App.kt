@@ -6,6 +6,15 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -100,7 +109,14 @@ fun App(
     onExitRequested: () -> Unit,
     initialPage: Int = 0,
 ) {
-    AppTheme {
+    var themeMode by remember { mutableStateOf(settings.themeMode) }
+    var showAbout by remember { mutableStateOf(false) }
+    // 开发用：--about 启动即打开关于弹窗
+    LaunchedEffect(Unit) {
+        if (top.ackd7.a7battery.appArgsContains("--about")) showAbout = true
+    }
+
+    AppTheme(themeModeOf(themeMode)) {
         var page by remember { mutableIntStateOf(initialPage.coerceIn(0, 2)) }
         // 鼠标配置状态放在这里：切页不丢，启动即自动读取
         val mouseState = rememberMouseConfigUiState(settings)
@@ -157,7 +173,15 @@ fun App(
                                 when (p) {
                                     0 -> BatteryPage(settings, monitor, battery, wide)
                                     1 -> MousePage(settings, mouseState, wide)
-                                    else -> SettingsPage(settings, updateInfo, onExitRequested, wide)
+                                    else -> SettingsPage(
+                                    settings = settings,
+                                    updateInfo = updateInfo,
+                                    onExitRequested = onExitRequested,
+                                    wide = wide,
+                                    themeMode = themeMode,
+                                    onThemeModeChange = { themeMode = it },
+                                    onShowAbout = { showAbout = true },
+                                )
                                 }
                             }
                         }
@@ -185,6 +209,10 @@ fun App(
                     onSelect = { page = it },
                     modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp),
                 )
+
+                if (showAbout) {
+                    AboutOverlay(onClose = { showAbout = false })
+                }
             }
         }
     }
@@ -513,11 +541,6 @@ private fun rememberMouseConfigUiState(settings: AppSettings): MouseConfigUiStat
 private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Boolean) {
     val c = rememberMochiColors()
 
-    val stageSummary = (0 until 6).joinToString(" · ") { i ->
-        val mark = if (i == state.activeDpiIndex) "*" else ""
-        "$mark${i + 1} ${state.dpiText[i]}"
-    }
-
     val deviceSection: @Composable () -> Unit = {
         MochiSection(header = "设备配置", footer = state.status.ifBlank { null }) {
             MochiRow(
@@ -531,24 +554,30 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
     }
 
     val dpiSection: @Composable () -> Unit = {
-        MochiSection(
-            header = "DPI",
-            footer = "各档：$stageSummary（* 当前档）",
-        ) {
-            // 当前档位
-            MochiDropdownRow(
-                title = "当前档位",
-                options = (1..6).map { "档位 $it" },
-                selectedIndex = state.activeDpiIndex,
-                onSelect = { state.activeDpiIndex = it },
-            )
+        MochiSection(header = "DPI") {
+            // 每个档位直接标注它的 DPI 大小，点一行即设为当前档
+            for (i in 0 until 6) {
+                val active = i == state.activeDpiIndex
+                MochiRow(
+                    title = "档位 ${i + 1}",
+                    value = state.dpiText[i],
+                    accent = active,
+                    divider = true,
+                    onClick = { state.activeDpiIndex = i },
+                    trailing = if (active) {
+                        { Check(color = c.accent) }
+                    } else {
+                        null
+                    },
+                )
+            }
 
-            // DPI 数值：预设 + 自定义
+            // 当前档的数值：预设 + 自定义
             val current = state.stageValue(state.activeDpiIndex)
             val presetIndex = DpiPresets.indexOf(current)
             val customSelected = presetIndex < 0 || state.customDpi
             MochiDropdownRow(
-                title = "DPI 数值",
+                title = "档位 ${state.activeDpiIndex + 1} 的数值",
                 options = DpiPresets.map { "$it" } + "自定义…",
                 selectedIndex = if (customSelected) DpiPresets.size else presetIndex,
                 divider = !customSelected,
@@ -565,7 +594,7 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
             if (customSelected) {
                 MochiRow(
                     title = "自定义数值",
-                    subtitle = "100–42000，直接输入后写入",
+                    subtitle = "100–42000",
                     divider = false,
                     trailing = {
                         BasicTextField(
@@ -661,13 +690,39 @@ private fun SettingsPage(
     updateInfo: UpdateInfo,
     onExitRequested: () -> Unit,
     wide: Boolean,
+    themeMode: String,
+    onThemeModeChange: (String) -> Unit,
+    onShowAbout: () -> Unit,
 ) {
     var autoStart by remember { mutableStateOf(settings.autoStart) }
     var showPercent by remember { mutableStateOf(settings.showPercentInTray) }
     var checkUpdates by remember { mutableStateOf(settings.checkUpdates) }
+    var lowAlert by remember { mutableStateOf(settings.lowBatteryAlert) }
+    var alertThreshold by remember { mutableIntStateOf(settings.alertThreshold) }
 
     val generalSection: @Composable () -> Unit = {
-        MochiSection(header = "常规", footer = "开机自启写入当前用户启动项，无需管理员权限") {
+        MochiSection(header = "常规") {
+            val themeOptions = listOf("跟随系统", "浅色", "深色")
+            val themeIndex = when (themeMode) {
+                "light" -> 1
+                "dark" -> 2
+                else -> 0
+            }
+            MochiDropdownRow(
+                title = "外观",
+                options = themeOptions,
+                selectedIndex = themeIndex,
+                onSelect = { idx ->
+                    val mode = when (idx) {
+                        1 -> "light"
+                        2 -> "dark"
+                        else -> "system"
+                    }
+                    onThemeModeChange(mode)
+                    settings.themeMode = mode
+                    settings.save()
+                },
+            )
             MochiRow(
                 title = "开机自启",
                 divider = true,
@@ -685,7 +740,7 @@ private fun SettingsPage(
             )
             MochiRow(
                 title = "托盘显示电量百分比",
-                divider = true,
+                divider = false,
                 trailing = {
                     MochiSwitch(
                         checked = showPercent,
@@ -697,8 +752,14 @@ private fun SettingsPage(
                     )
                 },
             )
+        }
+    }
+
+    val updateSection: @Composable () -> Unit = {
+        MochiSection(header = "更新") {
             MochiRow(
                 title = "自动检查更新",
+                subtitle = "每次启动时检查 GitHub Releases",
                 divider = false,
                 trailing = {
                     MochiSwitch(
@@ -714,12 +775,55 @@ private fun SettingsPage(
         }
     }
 
+    val alertSection: @Composable () -> Unit = {
+        MochiSection(
+            header = "提醒",
+            footer = if (lowAlert) {
+                "电量降到 $alertThreshold% 或以下时用托盘气泡提醒一次，电量回升后自动重新待命。"
+            } else {
+                null
+            },
+        ) {
+            MochiRow(
+                title = "低电量提醒",
+                divider = lowAlert,
+                trailing = {
+                    MochiSwitch(
+                        checked = lowAlert,
+                        onCheckedChange = { checked ->
+                            lowAlert = checked
+                            settings.lowBatteryAlert = checked
+                            settings.save()
+                        },
+                    )
+                },
+            )
+            if (lowAlert) {
+                val thresholds = listOf(10, 15, 20, 25, 30, 40, 50)
+                MochiDropdownRow(
+                    title = "提醒阈值",
+                    options = thresholds.map { "$it%" },
+                    selectedIndex = thresholds.indexOf(alertThreshold).coerceAtLeast(4),
+                    onSelect = { idx ->
+                        alertThreshold = thresholds[idx]
+                        settings.alertThreshold = alertThreshold
+                        settings.save()
+                    },
+                    divider = false,
+                )
+            }
+        }
+    }
+
     val aboutSection: @Composable () -> Unit = {
         MochiSection(header = "关于") {
             MochiRow(
                 title = "版本",
+                subtitle = "查看更新内容",
                 value = "v$APP_VERSION",
+                chevron = true,
                 divider = updateInfo.available && updateInfo.latestVersion.isNotBlank(),
+                onClick = onShowAbout,
             )
             if (updateInfo.available && updateInfo.latestVersion.isNotBlank()) {
                 MochiRow(
@@ -755,6 +859,8 @@ private fun SettingsPage(
                     .verticalScroll(rememberScrollState()),
             ) {
                 generalSection()
+                Spacer(Modifier.height(22.dp))
+                updateSection()
                 Spacer(Modifier.height(BottomInset))
             }
             Column(
@@ -763,6 +869,8 @@ private fun SettingsPage(
                     .fillMaxHeight()
                     .verticalScroll(rememberScrollState()),
             ) {
+                alertSection()
+                Spacer(Modifier.height(22.dp))
                 aboutSection()
                 Spacer(Modifier.height(22.dp))
                 exitSection()
@@ -776,8 +884,125 @@ private fun SettingsPage(
             verticalArrangement = Arrangement.spacedBy(22.dp),
         ) {
             item { generalSection() }
+            item { updateSection() }
+            item { alertSection() }
             item { aboutSection() }
             item { exitSection() }
+        }
+    }
+}
+
+// ---------------- 关于（更新内容弹窗） ----------------
+
+/** 内置的更新摘要（发版时同步维护）。 */
+private val RecentChanges = listOf(
+    "3.1.0" to listOf(
+        "新增浅色 / 深色 / 跟随系统三种外观",
+        "新增低电量提醒，阈值可自选",
+        "DPI 档位直接标注数值，并支持自定义 DPI",
+        "版本卡片可点开查看更新内容",
+    ),
+    "3.0.0" to listOf(
+        "鼠标页改为下拉选项，DPI 支持自定义",
+        "修复 DPI 读到乱值并被写入设置的问题",
+    ),
+    "2.0.11" to listOf(
+        "页面切换动画更克制，修复跨页动画像被吞掉",
+        "选项面板增加弹出动画",
+        "休眠时显示「休眠中」并保留上次读数",
+    ),
+    "2.0.9" to listOf(
+        "启动自动读取鼠标配置",
+        "修复回报率恒显示 125 Hz",
+    ),
+)
+
+@Composable
+private fun AboutOverlay(onClose: () -> Unit) {
+    val c = rememberMochiColors()
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val scale by animateFloatAsState(
+        targetValue = if (shown) 1f else 0.92f,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "aboutScale",
+    )
+    val alpha by animateFloatAsState(
+        targetValue = if (shown) 1f else 0f,
+        animationSpec = tween(durationMillis = 140),
+        label = "aboutAlpha",
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.45f * alpha))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClose,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 460.dp)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                }
+                .clip(RoundedCornerShape(22.dp))
+                .background(c.card)
+                .border(1.dp, c.cardBorder, RoundedCornerShape(22.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                )
+                .padding(20.dp),
+        ) {
+            Text("A7 电量助手", fontSize = 18.sp, color = c.text)
+            Spacer(Modifier.height(4.dp))
+            Text("v$APP_VERSION", fontSize = 13.sp, color = c.secondary)
+            Spacer(Modifier.height(16.dp))
+            Text("更新内容", fontSize = 13.sp, color = c.secondary)
+            Spacer(Modifier.height(8.dp))
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 300.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                RecentChanges.forEach { (ver, items) ->
+                    Text("v$ver", fontSize = 14.sp, color = c.accent)
+                    Spacer(Modifier.height(4.dp))
+                    items.forEach { line ->
+                        Text(
+                            "· $line",
+                            fontSize = 13.sp,
+                            color = c.text,
+                            modifier = Modifier.padding(start = 6.dp, bottom = 2.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+            MochiButtonRow(
+                text = "打开项目主页",
+                onClick = {
+                    runCatching {
+                        java.awt.Desktop.getDesktop().browse(
+                            java.net.URI("https://github.com/ackd7/A7Battery"),
+                        )
+                    }
+                },
+            )
+            MochiButtonRow(text = "关闭", onClick = onClose)
         }
     }
 }

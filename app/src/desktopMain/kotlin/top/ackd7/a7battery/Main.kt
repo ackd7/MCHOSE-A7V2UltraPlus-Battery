@@ -55,7 +55,12 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.0.0"
+const val APP_VERSION = "3.1.0"
+
+/** 启动参数（供 UI 层读取开发开关）。 */
+private var startupArgs: Array<String> = emptyArray()
+
+internal fun appArgsContains(arg: String): Boolean = startupArgs.contains(arg)
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -94,6 +99,7 @@ private fun installStdStreamTee() {
 }
 
 fun main(args: Array<String>) {
+    startupArgs = args
     installStdStreamTee()
     Thread.setDefaultUncaughtExceptionHandler { t, e ->
         appLog("UNCAUGHT in ${t.name}: ${e.stackTraceToString()}")
@@ -146,6 +152,8 @@ fun main(args: Array<String>) {
 
             var lastLogged = ""
             var lastGood: BatteryInfo? = null
+            // 低电量提醒：降到阈值提醒一次，电量回升（阈值 +5）后重新待命
+            var alertArmed = true
             monitor.onReadingChanged = { info ->
                 // 设备休眠时固件会返回全 0；此时保留上一次成功读数，避免界面突然变 "--"
                 val effective = if (info.success) {
@@ -160,6 +168,23 @@ fun main(args: Array<String>) {
                     lastLogged = brief
                     appLog("读数: $brief")
                 }
+                // 低电量提醒
+                if (settings.lowBatteryAlert && effective.success && !effective.charging) {
+                    val threshold = settings.alertThreshold
+                    if (effective.percent in 0..100) {
+                        if (effective.percent <= threshold && alertArmed) {
+                            alertArmed = false
+                            tray?.notify(
+                                "鼠标电量不足",
+                                "剩余 ${effective.percent}%，建议及时充电。",
+                            )
+                            appLog("低电量提醒：${effective.percent}%（阈值 $threshold%）")
+                        } else if (effective.percent > threshold + 5) {
+                            alertArmed = true
+                        }
+                    }
+                }
+
                 val t = tray
                 if (t != null) {
                     javax.swing.SwingUtilities.invokeLater {
@@ -184,16 +209,15 @@ fun main(args: Array<String>) {
                 menuVisible = true
             }
 
+            // 每次启动都检查一次更新（网络开销很小，用户也期望"打开就检查"）
             if (settings.checkUpdates) {
-                val today = java.time.LocalDate.now().toString()
-                if (today != settings.lastUpdateCheck) {
-                    val info = withContext(Dispatchers.IO) {
-                        runCatching { UpdateChecker().check(APP_VERSION) }.getOrDefault(UpdateInfo())
-                    }
-                    settings.lastUpdateCheck = today
-                    settings.save()
-                    updateInfo = info
+                val info = withContext(Dispatchers.IO) {
+                    runCatching { UpdateChecker().check(APP_VERSION) }.getOrDefault(UpdateInfo())
                 }
+                settings.lastUpdateCheck = java.time.LocalDate.now().toString()
+                settings.save()
+                updateInfo = info
+                appLog("检查更新：latest=${info.latestVersion} available=${info.available} err=${info.error}")
             }
         }
 

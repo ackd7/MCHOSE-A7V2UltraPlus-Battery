@@ -20,6 +20,12 @@ data class AppSettings(
     var dpiStages: IntArray = intArrayOf(400, 800, 1600, 3200, 6400, 26000),
     var activeDpiIndex: Int = 2,
     var rateHz: Int = 1000,
+    /** 外观：system / light / dark */
+    var themeMode: String = "system",
+    /** 低电量提醒开关 */
+    var lowBatteryAlert: Boolean = true,
+    /** 低电量提醒阈值（电量降到该值或以下时提醒） */
+    var alertThreshold: Int = 30,
 ) {
     companion object {
         private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
@@ -56,6 +62,8 @@ data class AppSettings(
         }
         activeDpiIndex = activeDpiIndex.coerceIn(0, 5)
         if (rateHz < 125) rateHz = 1000
+        if (themeMode !in listOf("system", "light", "dark")) themeMode = "system"
+        alertThreshold = alertThreshold.coerceIn(5, 60)
         return this
     }
 

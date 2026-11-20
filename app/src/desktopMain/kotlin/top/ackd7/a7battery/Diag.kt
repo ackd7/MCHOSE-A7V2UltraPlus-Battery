@@ -3,12 +3,23 @@ package top.ackd7.a7battery
 import top.ackd7.a7battery.interop.HidNative
 import top.ackd7.a7battery.services.MchoseBatteryReader
 import top.ackd7.a7battery.services.MouseConfigService
+import top.ackd7.a7battery.services.UpdateChecker
 
 /**
  * 本地诊断入口（不打包进发布产物，仅用于开发调试）。
  * 用法：./gradlew.bat :app:diag
  */
 fun main() {
+    println("=== 更新检查 ===")
+    runCatching {
+        val checker = UpdateChecker()
+        val asOld = checker.check("2.0.0")
+        println("以 2.0.0 为当前版本：latest=${asOld.latestVersion} available=${asOld.available} err=${asOld.error}")
+        val asLatest = checker.check(APP_VERSION)
+        println("以 $APP_VERSION 为当前版本：latest=${asLatest.latestVersion} available=${asLatest.available} err=${asLatest.error}")
+        println("isNewer(v3.0.0, 2.9.9) = ${UpdateChecker.isNewer("v3.0.0", "2.9.9")}")
+    }.onFailure { println("更新检查异常: ${it.message}") }
+
     println("=== Dispatchers.Main 可用性 ===")
     val mainOk = runCatching {
         kotlinx.coroutines.runBlocking {

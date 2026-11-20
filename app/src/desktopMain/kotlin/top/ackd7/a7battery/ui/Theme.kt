@@ -12,11 +12,20 @@ import top.yukonga.miuix.kmp.theme.ThemeController
  * （主色 #3482FF 等），不再使用 WPF 的 Material Design 3。
  */
 @Composable
-fun AppTheme(content: @Composable () -> Unit) {
-    val controller = remember {
-        ThemeController(ColorSchemeMode.System)
-    }
+fun AppTheme(
+    mode: ColorSchemeMode = ColorSchemeMode.System,
+    content: @Composable () -> Unit,
+) {
+    // 模式变化时重建 controller，保证浅色/深色即时生效
+    val controller = remember(mode) { ThemeController(mode) }
     MiuixTheme(controller = controller) {
         content()
     }
+}
+
+/** 把设置里的字符串映射成 miuix 的配色模式。 */
+fun themeModeOf(mode: String): ColorSchemeMode = when (mode) {
+    "light" -> ColorSchemeMode.Light
+    "dark" -> ColorSchemeMode.Dark
+    else -> ColorSchemeMode.System
 }
