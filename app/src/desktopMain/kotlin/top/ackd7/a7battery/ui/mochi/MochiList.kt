@@ -4,6 +4,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +36,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextAlign
@@ -299,8 +303,40 @@ fun MochiDropdownRow(
                 onDismissRequest = { expanded = false },
                 properties = PopupProperties(focusable = true),
             ) {
+                // 弹出动画：缩放 + 淡入 + 轻微下落，末端带弹簧
+                var shown by remember { mutableStateOf(false) }
+                LaunchedEffect(Unit) { shown = true }
+                val scale by animateFloatAsState(
+                    targetValue = if (shown) 1f else 0.88f,
+                    animationSpec = spring(
+                        dampingRatio = 0.62f,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                    label = "menuScale",
+                )
+                val alpha by animateFloatAsState(
+                    targetValue = if (shown) 1f else 0f,
+                    animationSpec = tween(durationMillis = 120),
+                    label = "menuAlpha",
+                )
+                val rise by animateDpAsState(
+                    targetValue = if (shown) 0.dp else (-10).dp,
+                    animationSpec = spring(
+                        dampingRatio = 0.7f,
+                        stiffness = Spring.StiffnessMediumLow,
+                    ),
+                    label = "menuRise",
+                )
+
                 Column(
                     modifier = Modifier
+                        .offset(y = rise)
+                        .graphicsLayer {
+                            scaleX = scale
+                            scaleY = scale
+                            this.alpha = alpha
+                            transformOrigin = TransformOrigin(0.5f, 0f)
+                        }
                         .width(180.dp)
                         .shadow(18.dp, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))

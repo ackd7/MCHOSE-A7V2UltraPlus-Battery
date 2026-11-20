@@ -1,8 +1,7 @@
 package top.ackd7.a7battery.ui
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -130,16 +129,21 @@ fun App(
                             transitionSpec = {
                                 val forward = targetState > initialState
                                 val dir = if (forward) 1 else -1
-                                // 软一点、带回弹（低阻尼 + 低刚度），有轻微过冲
-                                val slideSpec = spring<IntOffset>(
-                                    dampingRatio = 0.62f,
-                                    stiffness = Spring.StiffnessLow,
+                                // 用固定时长的缓动而不是弹簧：
+                                // 弹簧在跨页切换时收敛过快，看起来像"没动画"；这里末端带一点过冲，保留弹性手感
+                                val slideIn = tween<IntOffset>(
+                                    durationMillis = 300,
+                                    easing = CubicBezierEasing(0.22f, 1.04f, 0.36f, 1f),
                                 )
-                                // 纯滑动、不做淡入淡出：新页是不透明的，滑入时直接盖住旧页，
-                                // 避免两页 alpha 叠加导致文字互相透出
-                                slideInHorizontally(slideSpec) { full -> dir * full }
-                                    .togetherWith(
-                                        slideOutHorizontally(slideSpec) { full -> -dir * full / 3 },
+                                val slideOut = tween<IntOffset>(
+                                    durationMillis = 300,
+                                    easing = CubicBezierEasing(0.3f, 0.9f, 0.4f, 1f),
+                                )
+                                (
+                                    slideInHorizontally(slideIn) { full -> dir * full }
+                                        .togetherWith(
+                                            slideOutHorizontally(slideOut) { full -> -dir * full / 3 },
+                                        )
                                     )
                             },
                             label = "pageSwitch",
@@ -298,9 +302,8 @@ private fun BatteryCard(
                 InfoColumn(
                     label = "状态",
                     value = when {
-                        battery.stale -> "休眠 · 上次读数"
-                        !battery.success -> "离线 / 休眠"
-                        battery.charging -> "正在充电"
+                        battery.stale || !battery.success -> "休眠中"
+                        battery.charging -> "充电中"
                         else -> "放电中"
                     },
                 )
@@ -328,7 +331,12 @@ private fun RefreshSection(
     var refreshSeconds by remember { mutableIntStateOf(settings.refreshSeconds) }
     MochiSection(
         header = "刷新",
-        footer = if (!battery.success && battery.error.isNotBlank()) battery.error else null,
+        footer = when {
+            battery.stale ->
+                "设备休眠中，以上为 ${formatTime(battery.updatedAt)} 的数据；轻动鼠标即可刷新。"
+            !battery.success && battery.error.isNotBlank() -> battery.error
+            else -> null
+        },
     ) {
         MochiDropdownRow(
             title = "自动刷新间隔",

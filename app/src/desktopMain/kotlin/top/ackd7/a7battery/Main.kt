@@ -55,7 +55,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.10"
+const val APP_VERSION = "2.0.11"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -228,9 +228,9 @@ fun main(args: Array<String>) {
                 })
             }
 
-            // 开发用：Robot 点击底部「鼠标」标签，并在动画中途截图（验证滑动切换）
+            // 开发用：点开「自动刷新间隔」下拉，验证弹出动画与面板位置
             LaunchedEffect(Unit) {
-                if (args.contains("--test-switch")) {
+                if (args.contains("--test-dropdown")) {
                     kotlinx.coroutines.delay(3000)
                     win.isAlwaysOnTop = true
                     win.toFront()
@@ -239,16 +239,51 @@ fun main(args: Array<String>) {
                     withContext(Dispatchers.IO) {
                         runCatching {
                             val robot = java.awt.Robot()
-                            val x = win.x + win.width / 2      // 中间那项 = 鼠标
+                            // 电量页右列「自动刷新间隔」这一行
+                            val x = win.x + win.width * 3 / 4
+                            val y = win.y + 122
+                            robot.mouseMove(x, y)
+                            Thread.sleep(150)
+                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(60)
+                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
+                            Thread.sleep(500)
+                            val img = robot.createScreenCapture(win.bounds)
+                            javax.imageio.ImageIO.write(
+                                img,
+                                "png",
+                                java.io.File(System.getProperty("java.io.tmpdir"), "a7-dropdown.png"),
+                            )
+                        }.onFailure { appLog("下拉测试失败: " + it.message) }
+                    }
+                    appLog("下拉测试：已点开选项并截图")
+                    win.isAlwaysOnTop = false
+                }
+            }
+
+            // 开发用：Robot 点击底部「鼠标」标签，并在动画中途截图（验证滑动切换）
+            LaunchedEffect(Unit) {
+                val switchArg = args.firstOrNull { it.startsWith("--test-switch") }
+                if (switchArg != null) {
+                    val tabIndex = switchArg.substringAfter("=", "2").toIntOrNull() ?: 2
+                    kotlinx.coroutines.delay(3000)
+                    win.isAlwaysOnTop = true
+                    win.toFront()
+                    win.requestFocus()
+                    kotlinx.coroutines.delay(700)
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            val robot = java.awt.Robot()
+                            val x = win.x + win.width / 2 + (tabIndex - 2) * 84  // 标签项宽 84dp
                             val y = win.y + win.height - 44    // 悬浮标签栏位置
                             robot.mouseMove(x, y)
                             Thread.sleep(120)
                             robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
                             Thread.sleep(60)
                             robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            // 连拍 6 帧，捕捉滑动过程
-                            for (i in 1..6) {
-                                Thread.sleep(45)
+                            // 连拍 10 帧（25ms 间隔），捕捉滑动过程
+                            for (i in 1..10) {
+                                Thread.sleep(25)
                                 val img = robot.createScreenCapture(win.bounds)
                                 javax.imageio.ImageIO.write(
                                     img,
