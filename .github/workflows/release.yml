@@ -132,7 +132,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('v{0}', steps.version.outputs.version) }}
-          name: A7Battery v${{ steps.version.outputs.version }}
+          name: MCHOSE A7 V2 Ultra+ Battery v${{ steps.version.outputs.version }}
           body_path: release-notes.md
           files: |
             dist/*.exe
