@@ -55,7 +55,7 @@ import top.ackd7.mchose.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.2.0"
+const val APP_VERSION = "3.2.1"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -213,6 +213,15 @@ fun main(args: Array<String>) {
             if (args.contains("--test-menu")) {
                 kotlinx.coroutines.delay(1500)
                 menuVisible = true
+            }
+
+            // 开机自启迁移：旧版本写的是 A7Battery 注册表值 + 旧 exe 路径，
+            // 升级后旧 exe 已不存在。按设置里的开关重写一次，顺带清掉旧值。
+            if (settings.autoStart) {
+                withContext(Dispatchers.IO) {
+                    top.ackd7.mchose.services.Autostart.setEnabled(true)
+                }
+                appLog("开机自启已刷新为新路径")
             }
 
             // 每次启动都检查一次更新（网络开销很小，用户也期望"打开就检查"）
