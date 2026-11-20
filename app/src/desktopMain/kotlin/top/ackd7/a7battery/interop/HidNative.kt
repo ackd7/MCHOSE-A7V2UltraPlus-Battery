@@ -26,11 +26,7 @@ object HidNative {
 
     // ---------- 常量 ----------
 
-    private const val GENERIC_READ = 0x80000000
-    private const val GENERIC_WRITE = 0x40000000
-    private const val FILE_SHARE_RW = 0x00000003
-    private const val OPEN_EXISTING = 3
-    private const val FILE_FLAG_OVERLAPPED = 0x40000000
+    private const val FILE_SHARE_RW = WinNT.FILE_SHARE_READ or WinNT.FILE_SHARE_WRITE
     private const val ERROR_IO_PENDING = 997
     private const val DIGCF_PRESENT = 0x00000002
     private const val DIGCF_DEVICEINTERFACE = 0x00000010
@@ -131,7 +127,7 @@ object HidNative {
                 // 路径位于偏移 4 之后（cbSize 为 4 字节 DWORD）
                 val path = buf.getWideString(4) ?: continue
 
-                val h = Kernel32.INSTANCE.CreateFile(path, 0, FILE_SHARE_RW, null, OPEN_EXISTING, 0, null)
+                val h = Kernel32.INSTANCE.CreateFile(path, 0, FILE_SHARE_RW, null, WinNT.OPEN_EXISTING, 0, null)
                 if (h == WinBase.INVALID_HANDLE_VALUE) continue
                 try {
                     val attrs = HIDD_ATTRIBUTES()
@@ -189,8 +185,8 @@ object HidNative {
         private var closed = false
 
         init {
-            val access = if (readOnly) GENERIC_READ else (GENERIC_READ or GENERIC_WRITE)
-            handle = Kernel32.INSTANCE.CreateFile(path, access, FILE_SHARE_RW, null, OPEN_EXISTING, FILE_FLAG_OVERLAPPED, null)
+            val access = if (readOnly) WinNT.GENERIC_READ else (WinNT.GENERIC_READ or WinNT.GENERIC_WRITE)
+            handle = Kernel32.INSTANCE.CreateFile(path, access, FILE_SHARE_RW, null, WinNT.OPEN_EXISTING, WinNT.FILE_FLAG_OVERLAPPED, null)
             if (handle == WinBase.INVALID_HANDLE_VALUE) {
                 throw IllegalStateException("无法打开 HID 设备，错误码 " + Native.getLastError())
             }

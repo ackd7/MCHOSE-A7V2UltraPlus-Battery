@@ -54,7 +54,7 @@ jobs:
       - name: 打包桌面分发（MSI + EXE）
         shell: pwsh
         run: |
-          .\gradlew.bat :app:packageDistributionForCurrentOS -Pversion="${{ steps.version.outputs.version }}" --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath package-log.txt
+          .\gradlew.bat :app:packageDistributionForCurrentOS -PappVersion="${{ steps.version.outputs.version }}" --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath package-log.txt
           exit $LASTEXITCODE
 
       - name: 上传构建日志（失败时）

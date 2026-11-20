@@ -2,6 +2,7 @@ package top.ackd7.a7battery
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -25,23 +26,20 @@ fun main(args: Array<String>) {
     application {
         var tray: NativeTrayIcon? = null
         var updateInfo by mutableStateOf(UpdateInfo())
-        // 保存主窗口引用，供托盘回调重新显示窗口
-        var mainWindow: java.awt.Window? = null
+        // 控制窗口显示/隐藏的状态
+        var isVisible by remember { mutableStateOf(!startMinimized) }
 
         val windowState = rememberWindowState(size = DpSize(420.dp, 720.dp))
 
         Window(
             onCloseRequest = {
                 // 关闭按钮只隐藏窗口；完全退出用托盘右键「退出」
-                this.window.isVisible = false
+                isVisible = false
             },
             title = "A7 电量助手",
             state = windowState,
-            visible = !startMinimized,
+            visible = isVisible,
         ) {
-            // 捕获当前 ComposeWindow 引用（AWT Window 子类）
-            mainWindow = this.window
-
             App(
                 settings = settings,
                 monitor = monitor,
@@ -56,17 +54,18 @@ fun main(args: Array<String>) {
 
         // 监控回调 → 刷新托盘（托盘图标绘制需在 EDT 上执行）
         monitor.onReadingChanged = { info ->
-            val t = tray ?: return@onReadingChanged
-            javax.swing.SwingUtilities.invokeLater {
-                val showPercent = settings.showPercentInTray
-                if (showPercent && info.success && info.percent >= 0) {
-                    t.setIcon(
-                        info.percent,
-                        info.charging,
-                        "迈从 A7 V2 Ultra+  ${info.percent}%  ${if (info.charging) "充电中" else "放电中"}"
-                    )
-                } else {
-                    t.setIcon(null, false, "A7 电量助手（设备休眠/未连接）")
+            tray?.let { t ->
+                javax.swing.SwingUtilities.invokeLater {
+                    val showPercent = settings.showPercentInTray
+                    if (showPercent && info.success && info.percent >= 0) {
+                        t.setIcon(
+                            info.percent,
+                            info.charging,
+                            "迈从 A7 V2 Ultra+  ${info.percent}%  ${if (info.charging) "充电中" else "放电中"}"
+                        )
+                    } else {
+                        t.setIcon(null, false, "A7 电量助手（设备休眠/未连接）")
+                    }
                 }
             }
         }
@@ -77,10 +76,8 @@ fun main(args: Array<String>) {
             tray = NativeTrayIcon().apply {
                 accent = java.awt.Color(0x34, 0x82, 0xFF)
                 onOpen = {
-                    javax.swing.SwingUtilities.invokeLater {
-                        mainWindow?.isVisible = true
-                        mainWindow?.toFront()
-                    }
+                    // 重新显示窗口
+                    isVisible = true
                 }
                 onRefresh = { monitor.refresh() }
                 onExit = {

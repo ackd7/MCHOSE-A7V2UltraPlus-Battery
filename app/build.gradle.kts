@@ -7,8 +7,9 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-// 版本号：优先取 -Pversion=xxx，其次取环境变量 APP_VERSION，默认 2.0.0
-val appVersion: String = (project.findProperty("version") as String?)
+// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 2.0.0
+// 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突
+val appVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
     ?: "2.0.0"
 
