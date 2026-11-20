@@ -1,6 +1,6 @@
 # A7 Battery
 
-一个基于 **WPF**（.NET 8）的 Windows 托盘小工具，用于查看 **迈从 MCHOSE A7 V2 Ultra+** 无线鼠标的精确电量。
+一个基于 **WPF**（.NET 8）的 Windows 托盘小工具，采用 **Material Design 3** 界面，用于查看 **迈从 MCHOSE A7 V2 Ultra+** 无线鼠标的精确电量。
 
 左键点击任务栏托盘图标即可快速查看电量，支持开机自启、可调刷新间隔，还能直接调整鼠标 DPI 与回报率、自动检查新版本。
 
@@ -40,12 +40,19 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 
 ## 下载与运行
 
-从 [Releases](../../releases) 下载 `A7Battery-win-x64.zip`，解压后运行 `A7Battery.exe`。
+从 [Releases](../../releases) 下载，有两种分发形式：
+
+- **安装包（推荐）**：`A7Battery-Setup-v1.2.0.exe` —— 双击安装，写入卸载注册表（在「设置 → 应用」/ 控制面板「程序和功能」中可正常卸载），可选创建桌面快捷方式与开机自启。安装到 `Program Files\A7Battery`，需要管理员权限。
+- **便携解压版**：`A7Battery-win-x64.zip` —— 解压后运行 `A7Battery.exe`，免安装、免管理员权限。
 
 - 双击运行即显示主窗口；关闭窗口后程序继续在托盘运行，左键托盘图标可再次打开。
 - 右键托盘图标 → 「退出」可完全退出程序。
-- 无需安装、无需管理员权限、无需厂商驱动、**无需任何额外运行时**。
-- 需要 Windows 10 1903+ / Windows 11。发布的 zip 为自包含版本，内含 .NET 8 运行时，解压即用。
+- 无需厂商驱动、**无需任何额外运行时**（自包含 .NET 8 + WPF + Material Design 3）。
+- 需要 Windows 10 1903+ / Windows 11 x64。
+
+## 界面
+
+采用 Material Design 3（通过 [MaterialDesignInXAML](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit) 5.x 的 MD3 主题），浅色配色 + 紫罗兰主色，卡片 / 开关 / 按钮 / 进度条均为 MD3 风格。电量数字按高低变色（高=主题紫、中=琥珀、低=红），充电时显示闪电图标。
 
 ## 从源码构建
 
@@ -57,10 +64,26 @@ WPF 的 XAML 编译器内置于 .NET SDK，因此普通 `dotnet build` 即可完
 # 调试构建（框架依赖，需本机已装 .NET 8 桌面运行时）
 dotnet build src/A7Battery/A7Battery.csproj -c Debug -p:Platform=x64
 
-# 发布构建（自包含 .NET 8 + WPF，可直接分发）
+# 发布构建（自包含 .NET 8 + WPF + MD3，可直接分发）
 dotnet build src/A7Battery/A7Battery.csproj -c Release -p:Platform=x64
 # 产物：src/A7Battery/bin/x64/Release/net8.0-windows/win-x64/
 ```
+
+## 制作安装包
+
+使用 [Inno Setup 6](https://jrsoftware.org/isinfo.php) 生成带卸载注册表的安装程序：
+
+```powershell
+# 先构建 Release，再编译安装脚本
+"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\A7Battery.iss
+# 产物：dist\installer\A7Battery-Setup-v1.2.0.exe
+```
+
+安装脚本位于 `installer/A7Battery.iss`，包含：
+- 卸载注册表项（HKLM Uninstall，可在「程序和功能」中卸载）
+- 开始菜单快捷方式 + 卸载入口；可选桌面快捷方式
+- 可选开机自启（写 HKCU `...\Run`，与程序内设置一致）
+- 安装前自动结束正在运行的旧实例
 
 ## 电量探测工具
 
@@ -84,9 +107,10 @@ A7Battery/
 │   │   ├── BatteryMonitor.cs     # 轮询调度（DispatcherTimer）
 │   │   ├── AppSettings.cs        # 设置持久化
 │   │   └── Autostart.cs          # 开机自启（注册表）
-│   ├── MainWindow.xaml / .cs     # 主界面（WPF XAML）
-│   ├── App.cs / Program.cs       # 入口与生命周期
+│   ├── MainWindow.xaml / .cs     # 主界面（WPF XAML，Material Design 3）
+│   ├── App.xaml / App.cs         # 全局 MD3 资源与生命周期入口
 │   └── Assets/app.ico            # 应用图标
+├── installer/A7Battery.iss       # Inno Setup 安装包脚本（卸载注册表）
 ├── tools/Probe/                  # HID 探测命令行工具
 └── tools/make_icon.py            # 图标生成脚本
 ```

@@ -7,9 +7,9 @@ using A7Battery.Services;
 
 namespace A7Battery;
 
-public sealed class App : Application
+public sealed partial class App : Application
 {
-    public const string AppVersion = "1.1.0";
+    public const string AppVersion = "1.2.0";
 
     private AppSettings _settings = null!;
     private BatteryMonitor _monitor = null!;

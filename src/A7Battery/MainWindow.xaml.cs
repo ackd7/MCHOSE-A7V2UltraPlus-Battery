@@ -69,8 +69,8 @@ public sealed partial class MainWindow : Window
         foreach (var b in new[] { Btn15, Btn30, Btn90 })
         {
             bool active = int.TryParse(b.Tag?.ToString(), out int v) && v == sec;
-            b.Background = active ? Brush("#4CC2FF") : Brush("#F3F5F8");
-            b.Foreground = active ? Brushes.White : Brush("#5A6678");
+            b.Background = active ? Brush("#6750A4") : Brush("#EADDFF");
+            b.Foreground = active ? Brushes.White : Brush("#49454F");
         }
     }
 
@@ -236,7 +236,7 @@ public sealed partial class MainWindow : Window
                 var link = new Hyperlink(new Run("有新版本 " + info.LatestVersion + "，点击查看/下载"))
                 {
                     NavigateUri = new Uri(info.HtmlUrl),
-                    Foreground = Brush("#4CC2FF")
+                    Foreground = Brush("#6750A4")
                 };
                 link.RequestNavigate += (_, _) =>
                 {
@@ -270,7 +270,7 @@ public sealed partial class MainWindow : Window
         if (info == null) return;
         if (info.Success && info.Percent >= 0)
         {
-            var color = info.Percent >= 50 ? "#4CC2FF" : info.Percent >= 20 ? "#FFC83D" : "#FF5C5C";
+            var color = info.Percent >= 50 ? "#6750A4" : info.Percent >= 20 ? "#FFC83D" : "#FF5C5C";
             var brush = Brush(color);
             PercentText.Text = info.Percent.ToString();
             PercentText.Foreground = brush;
