@@ -45,6 +45,12 @@ jobs:
           echo "version=$ver" >> $env:GITHUB_OUTPUT
           Write-Host "版本号: $ver"
 
+      - name: 设置 UTF-8 编码（避免中文乱码）
+        shell: pwsh
+        run: |
+          echo "GRADLE_OPTS=-Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8" >> $env:GITHUB_ENV
+          chcp 65001
+
       - name: 编译检查（暴露编译错误）
         shell: pwsh
         run: |

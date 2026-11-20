@@ -55,7 +55,8 @@ compose.desktop {
             packageVersion = appVersion
 
             windows {
-                menuGroup = "A7 电量助手"
+                // 注意：menuGroup 不用中文，避免 GitHub Actions Windows runner 编码乱码导致打包失败
+                menuGroup = "A7Battery"
                 // 图标：沿用原 Assets/app.ico
                 iconFile.set(project.file("src/desktopMain/resources/app.ico"))
                 upgradeUuid = "8f3a1e2c-4b5d-4a6b-8c9e-0f1a2b3c4d5e"
