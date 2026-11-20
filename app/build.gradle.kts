@@ -16,6 +16,10 @@ val appVersion: String = (project.findProperty("appVersion") as String?)
 kotlin {
     jvm("desktop")
 
+    // miuix 用 JDK 21 编译（class file version 65），必须用 21 工具链编译+打包，
+    // 否则运行时内嵌 JRE 无法加载 miuix 的类
+    jvmToolchain(21)
+
     sourceSets {
         val desktopMain by getting
 
