@@ -52,7 +52,16 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 
 ## 界面
 
-采用 Material Design 3（通过 [MaterialDesignInXAML](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit) 5.x 的 MD3 主题），浅色配色 + 紫罗兰主色，卡片 / 开关 / 按钮 / 进度条均为 MD3 风格。电量数字按高低变色（高=主题紫、中=琥珀、低=红），充电时显示闪电图标。
+采用 Material Design 3（通过 [MaterialDesignInXAML](https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit) 5.x 的 MD3 主题），卡片 / 开关 / 按钮 / 进度条均为 MD3 风格。电量数字按高低变色（高=主题主色、中=琥珀、低=红），充电时显示闪电图标。
+
+### 动态 / 静态取色（Material You）
+
+参考 [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) 的 Material You 配色理念，界面提供两种取色模式：
+
+- **静态取色**：从 8 套预设种子色（紫罗兰、海洋蓝、青碧、森林绿、琥珀橙、玫红、靛青、石墨）中选择，配色持久保存。
+- **动态取色**：读取 Windows 系统强调色作为种子色。当 Windows 开启「设置 → 个性化 → 颜色 → 自动从壁纸选取主题色」时，强调色即来自当前壁纸——换壁纸后点「重新取色」即可让界面跟随，等价于 dots-hyprland 的 wallpaper → palette 流程。
+
+两种模式都会从一个种子色生成整套 MD3 语义色板（Primary / Secondary / Tertiary / Container / Surface / Outline …），实时应用到窗口、内置控件与托盘图标。色板生成使用 self-contained 的 HSL tonal 算法，无需额外依赖，切换即时生效。
 
 ## 从源码构建
 
@@ -102,6 +111,7 @@ A7Battery/
 │   ├── Services/
 │   │   ├── MchoseBatteryReader.cs # 电量协议解析
 │   │   ├── MouseConfigService.cs # DPI / 回报率读写协议
+│   │   ├── ThemeService.cs       # Material You 动态/静态取色
 │   │   ├── UpdateChecker.cs      # GitHub Releases 更新检查
 │   │   ├── NativeTrayIcon.cs     # 原生托盘图标（Shell_NotifyIcon）
 │   │   ├── BatteryMonitor.cs     # 轮询调度（DispatcherTimer）

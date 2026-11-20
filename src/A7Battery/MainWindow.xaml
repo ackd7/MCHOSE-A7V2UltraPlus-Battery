@@ -5,9 +5,9 @@
         Title="A7 电量助手" Height="700" Width="470"
         MinHeight="560" MinWidth="410"
         WindowStartupLocation="CenterScreen"
-        Background="{DynamicResource MaterialDesign.Brush.Background}"
+        Background="{DynamicResource A7.Background}"
         FontFamily="Roboto, Microsoft YaHei UI"
-        TextElement.Foreground="{DynamicResource MaterialDesign.Brush.Foreground}"
+        TextElement.Foreground="{DynamicResource A7.OnSurface}"
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13">
 
@@ -18,14 +18,14 @@
         </Grid.RowDefinitions>
 
         <!-- 顶栏 (MD3 TopAppBar) -->
-        <Border Grid.Row="0" Height="56" Background="{DynamicResource MaterialDesign.Brush.Surface}"
-                BorderBrush="{DynamicResource MaterialDesign.Brush.Divider}" BorderThickness="0,0,0,1">
+        <Border Grid.Row="0" Height="56" Background="{DynamicResource A7.Surface}"
+                BorderBrush="{DynamicResource A7.Divider}" BorderThickness="0,0,0,1">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
                 <materialDesign:PackIcon Kind="BatteryCharging" Width="22" Height="22"
-                                         Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                         Foreground="{DynamicResource A7.Primary}"
                                          VerticalAlignment="Center" Margin="0,0,12,0"/>
                 <TextBlock Text="A7 电量助手" FontSize="17" FontWeight="Medium"
-                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}" VerticalAlignment="Center"/>
+                           Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
 
@@ -38,15 +38,15 @@
                         <Grid>
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Mouse" Width="18" Height="18"
-                                                         Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                                         Foreground="{DynamicResource A7.Primary}"
                                                          VerticalAlignment="Center" Margin="0,0,6,0"/>
                                 <TextBlock Text="迈从 A7 V2 Ultra+" FontSize="15" FontWeight="Medium"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}" VerticalAlignment="Center"/>
+                                           Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                                 <Ellipse x:Name="StatusDot" Width="9" Height="9" Fill="#9AA5B4" Margin="0,0,6,0"/>
                                 <TextBlock x:Name="StatusText" Text="检测中" FontSize="12"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                           Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                             </StackPanel>
                         </Grid>
 
@@ -58,26 +58,26 @@
 
                             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock x:Name="PercentText" Text="--" FontSize="78" FontWeight="Light"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Primary}" LineHeight="92"/>
+                                           Foreground="{DynamicResource A7.Primary}" LineHeight="92"/>
                                 <TextBlock Text="%" FontSize="26" FontWeight="Light"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                           Foreground="{DynamicResource A7.Primary}"
                                            VerticalAlignment="Bottom" Margin="2,0,0,16"/>
                             </StackPanel>
 
                             <!-- 电池图形 -->
                             <Grid Grid.Column="1" Width="96" Height="96" VerticalAlignment="Center" Margin="0,0,4,0">
                                 <Border x:Name="BatteryOutline" Width="72" Height="38" CornerRadius="8"
-                                        BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}" BorderThickness="3"
+                                        BorderBrush="{DynamicResource A7.Primary}" BorderThickness="3"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 <Border Width="64" Height="30" CornerRadius="4"
-                                        Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}"
+                                        Background="{DynamicResource A7.SurfaceVariant}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="True">
                                     <Border x:Name="BatteryFill" Width="0" Height="30"
-                                            Background="{DynamicResource MaterialDesign.Brush.Primary}"
+                                            Background="{DynamicResource A7.Primary}"
                                             HorizontalAlignment="Left" VerticalAlignment="Center"/>
                                 </Border>
                                 <Rectangle x:Name="BatteryCap" Width="5" Height="15" RadiusX="2" RadiusY="2"
-                                           Fill="{DynamicResource MaterialDesign.Brush.Primary}"
+                                           Fill="{DynamicResource A7.Primary}"
                                            HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                 <materialDesign:PackIcon x:Name="BoltIcon" Kind="LightningBolt" Width="26" Height="26"
                                                          Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -86,9 +86,9 @@
                         </Grid>
 
                         <ProgressBar x:Name="BatteryBar" Height="8" Minimum="0" Maximum="100" Value="0"
-                                     Foreground="{DynamicResource MaterialDesign.Brush.Primary}" Margin="0,2,0,0"/>
+                                     Foreground="{DynamicResource A7.Primary}" Margin="0,2,0,0"/>
                         <TextBlock x:Name="ChargeText" Text="等待读取数据…" FontSize="12" Margin="0,10,0,0"
-                                   Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                   Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                     </StackPanel>
                 </materialDesign:Card>
 
@@ -97,26 +97,26 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <materialDesign:PackIcon Kind="InformationOutline" Width="17" Height="17"
-                                                     Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                                     Foreground="{DynamicResource A7.Primary}"
                                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <TextBlock Text="设备信息" FontSize="15" FontWeight="Medium"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}" VerticalAlignment="Center"/>
+                                       Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
                         </StackPanel>
                         <Grid Margin="0,0,0,9">
-                            <TextBlock Text="连接方式" FontSize="13" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                            <TextBlock Text="连接方式" FontSize="13" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                             <TextBlock x:Name="ModeText" Text="--" FontSize="13" HorizontalAlignment="Right"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"/>
+                                       Foreground="{DynamicResource A7.OnSurface}"/>
                         </Grid>
                         <Grid Margin="0,0,0,9">
-                            <TextBlock Text="设备通道" FontSize="13" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                            <TextBlock Text="设备通道" FontSize="13" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                             <TextBlock x:Name="DeviceText" Text="--" FontSize="12" HorizontalAlignment="Right"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                       Foreground="{DynamicResource A7.OnSurface}"
                                        MaxWidth="230" TextTrimming="CharacterEllipsis"/>
                         </Grid>
                         <Grid>
-                            <TextBlock Text="更新时间" FontSize="13" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                            <TextBlock Text="更新时间" FontSize="13" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                             <TextBlock x:Name="UpdateText" Text="--" FontSize="13" HorizontalAlignment="Right"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"/>
+                                       Foreground="{DynamicResource A7.OnSurface}"/>
                         </Grid>
                     </StackPanel>
                 </materialDesign:Card>
@@ -126,15 +126,15 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <materialDesign:PackIcon Kind="SettingsOutline" Width="17" Height="17"
-                                                     Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                                     Foreground="{DynamicResource A7.Primary}"
                                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <TextBlock Text="设置" FontSize="15" FontWeight="Medium"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}" VerticalAlignment="Center"/>
+                                       Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
                         </StackPanel>
 
                         <Grid Margin="0,0,0,10">
                             <TextBlock Text="刷新间隔" FontSize="13" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"/>
+                                       Foreground="{DynamicResource A7.OnSurface}"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                                 <Button x:Name="Btn15" Content="15s" Tag="15" Margin="0,0,6,0"
                                         Padding="12,4,12,4" FontSize="12" Click="Interval_Click"/>
@@ -147,9 +147,9 @@
 
                         <Grid Margin="0,0,0,6">
                             <StackPanel>
-                                <TextBlock Text="开机自启" FontSize="13" Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"/>
+                                <TextBlock Text="开机自启" FontSize="13" Foreground="{DynamicResource A7.OnSurface}"/>
                                 <TextBlock Text="登录 Windows 后自动在托盘运行" FontSize="11"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="AutoStartSwitch"
                                       HorizontalAlignment="Right" Checked="AutoStart_Toggled" Unchecked="AutoStart_Toggled"/>
@@ -157,9 +157,9 @@
 
                         <Grid Margin="0,0,0,6">
                             <StackPanel>
-                                <TextBlock Text="托盘显示电量" FontSize="13" Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"/>
+                                <TextBlock Text="托盘显示电量" FontSize="13" Foreground="{DynamicResource A7.OnSurface}"/>
                                 <TextBlock Text="在任务栏图标上直接显示百分比" FontSize="11"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="TrayPercentSwitch"
                                       IsChecked="True" HorizontalAlignment="Right"
@@ -168,9 +168,9 @@
 
                         <Grid Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="启动时检查更新" FontSize="13" Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"/>
+                                <TextBlock Text="启动时检查更新" FontSize="13" Foreground="{DynamicResource A7.OnSurface}"/>
                                 <TextBlock Text="每天首次启动时检查 GitHub 新版本" FontSize="11"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}" Margin="0,2,0,0"/>
+                                           Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,2,0,0"/>
                             </StackPanel>
                             <CheckBox x:Name="CheckUpdatesSwitch"
                                       IsChecked="True" HorizontalAlignment="Right"
@@ -187,68 +187,68 @@
                         <Grid Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="MouseVariant" Width="17" Height="17"
-                                                         Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                                                         Foreground="{DynamicResource A7.Primary}"
                                                          VerticalAlignment="Center" Margin="0,0,8,0"/>
                                 <TextBlock Text="鼠标设置 · DPI / 回报率" FontSize="15" FontWeight="Medium"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}" VerticalAlignment="Center"/>
+                                           Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
                             </StackPanel>
                             <Button x:Name="ReadMouseBtn" Content="读取当前" HorizontalAlignment="Right"
                                     Padding="12,4,12,4" FontSize="12" Click="ReadMouse_Click"/>
                         </Grid>
 
                         <TextBlock x:Name="MouseStatusText" Text="点击“读取当前”获取设备现有配置"
-                                   FontSize="11" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"
+                                   FontSize="11" Foreground="{DynamicResource A7.OnSurfaceVariant}"
                                    Margin="0,0,0,12" TextWrapping="Wrap"/>
 
                         <!-- DPI 档位 -->
                         <TextBlock Text="DPI 档位（6 档，点击数字可修改）" FontSize="12"
-                                   Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}" Margin="0,0,0,6"/>
+                                   Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,0,0,6"/>
                         <UniformGrid Rows="2" Columns="3" Margin="0,0,0,6">
-                            <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,5" Padding="6,4">
+                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,5" Padding="6,4">
                                 <StackPanel>
-                                    <TextBlock Text="档位 1" FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                    <TextBlock Text="档位 1" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <TextBox x:Name="Dpi0" Text="400" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                             Foreground="{DynamicResource A7.OnSurface}"
                                              BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,5" Padding="6,4">
+                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,5" Padding="6,4">
                                 <StackPanel>
-                                    <TextBlock Text="档位 2" FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                    <TextBlock Text="档位 2" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <TextBox x:Name="Dpi1" Text="800" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                             Foreground="{DynamicResource A7.OnSurface}"
                                              BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Margin="0,0,0,5" Padding="6,4">
+                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,0,5" Padding="6,4">
                                 <StackPanel>
-                                    <TextBlock Text="档位 3" FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                    <TextBlock Text="档位 3" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <TextBox x:Name="Dpi2" Text="1600" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                             Foreground="{DynamicResource A7.OnSurface}"
                                              BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,0" Padding="6,4">
+                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,0" Padding="6,4">
                                 <StackPanel>
-                                    <TextBlock Text="档位 4" FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                    <TextBlock Text="档位 4" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <TextBox x:Name="Dpi3" Text="3200" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                             Foreground="{DynamicResource A7.OnSurface}"
                                              BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,0" Padding="6,4">
+                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,0" Padding="6,4">
                                 <StackPanel>
-                                    <TextBlock Text="档位 5" FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                    <TextBlock Text="档位 5" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <TextBox x:Name="Dpi4" Text="6400" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                             Foreground="{DynamicResource A7.OnSurface}"
                                              BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Margin="0,0,0,0" Padding="6,4">
+                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,0,0" Padding="6,4">
                                 <StackPanel>
-                                    <TextBlock Text="档位 6" FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                    <TextBlock Text="档位 6" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <TextBox x:Name="Dpi5" Text="26000" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource MaterialDesign.Brush.OnSurface}"
+                                             Foreground="{DynamicResource A7.OnSurface}"
                                              BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
                                 </StackPanel>
                             </Border>
@@ -257,7 +257,7 @@
                         <Grid Margin="0,0,0,10">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <TextBlock Text="当前档位" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
-                                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                           Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                 <ComboBox x:Name="ActiveDpiCombo" Width="56" FontSize="12" VerticalAlignment="Center"
                                           SelectedIndex="2">
                                     <ComboBoxItem Content="1"/>
@@ -273,11 +273,11 @@
                         </Grid>
 
                         <!-- 回报率 -->
-                        <Border Background="{DynamicResource MaterialDesign.Brush.SurfaceVariant}" CornerRadius="12" Padding="10,8" Margin="0,0,0,10">
+                        <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Padding="10,8" Margin="0,0,0,10">
                             <Grid>
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock Text="回报率" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
-                                               Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                                               Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     <ComboBox x:Name="RateCombo" Width="100" FontSize="12" VerticalAlignment="Center" SelectedIndex="2">
                                         <ComboBoxItem Content="125 Hz" Tag="125"/>
                                         <ComboBoxItem Content="500 Hz" Tag="500"/>
@@ -293,23 +293,93 @@
                         </Border>
 
                         <TextBlock Text="设置写入鼠标板载配置，切换连接或重启后依然生效。仅 2.4G / 有线支持高回报率，蓝牙固定 1K。"
-                                   FontSize="10" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}" TextWrapping="Wrap"/>
+                                   FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </materialDesign:Card>
+
+                <!-- 主题取色卡片 -->
+                <materialDesign:Card UniformCornerRadius="20" Padding="20" Margin="0,0,0,12">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <materialDesign:PackIcon Kind="Palette" Width="17" Height="17"
+                                                     Foreground="{DynamicResource A7.Primary}"
+                                                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="主题取色 · Material You" FontSize="15" FontWeight="Medium"
+                                       Foreground="{DynamicResource A7.OnSurface}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="参考 dots-hyprland 的动态配色：从种子色生成整套 MD3 调色板"
+                                   FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"
+                                   TextWrapping="Wrap" Margin="25,0,0,12"/>
+
+                        <!-- 模式切换 -->
+                        <Grid Margin="0,0,0,10">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="ThemeStaticBtn" Content="静态取色" Click="ThemeStatic_Click"
+                                        Padding="14,5,14,5" FontSize="12" Margin="0,0,6,0"/>
+                                <Button x:Name="ThemeDynamicBtn" Content="动态取色" Click="ThemeDynamic_Click"
+                                        Padding="14,5,14,5" FontSize="12"/>
+                            </StackPanel>
+                            <TextBlock x:Name="ThemeModeLabel" Text="" FontSize="11" HorizontalAlignment="Right"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                        </Grid>
+
+                        <!-- 静态：预设色板 -->
+                        <StackPanel x:Name="StaticPalettePanel">
+                            <TextBlock Text="预设种子色" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,0,0,8"/>
+                            <WrapPanel x:Name="PresetSwatches" Margin="0,0,0,6"/>
+                        </StackPanel>
+
+                        <!-- 动态：系统强调色 -->
+                        <StackPanel x:Name="DynamicPalettePanel" Visibility="Collapsed">
+                            <Grid Margin="0,0,0,8">
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Border x:Name="AccentSwatch" Width="26" Height="26" CornerRadius="13"
+                                            Background="{DynamicResource A7.Primary}" BorderBrush="{DynamicResource A7.OutlineVariant}"
+                                            BorderThickness="1" Margin="0,0,8,0"/>
+                                    <StackPanel>
+                                        <TextBlock Text="跟随 Windows 强调色" FontSize="12" Foreground="{DynamicResource A7.OnSurface}"/>
+                                        <TextBlock x:Name="AccentHexText" Text="" FontSize="11" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <Button x:Name="RefreshAccentBtn" Content="重新取色" Click="RefreshAccent_Click"
+                                        HorizontalAlignment="Right" Padding="12,4,12,4" FontSize="12"/>
+                            </Grid>
+                            <TextBlock Text="开启 Windows「自动从壁纸取色」后，这里会随壁纸变化。"
+                                       FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}" TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- 当前色板预览 -->
+                        <Border Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Padding="10,8" Margin="0,6,0,0">
+                            <StackPanel>
+                                <TextBlock Text="当前调色板" FontSize="11" Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Border x:Name="SwatchPrimary" Width="30" Height="30" CornerRadius="8" Margin="0,0,6,0"/>
+                                    <Border x:Name="SwatchSecondary" Width="30" Height="30" CornerRadius="8" Margin="0,0,6,0"/>
+                                    <Border x:Name="SwatchTertiary" Width="30" Height="30" CornerRadius="8" Margin="0,0,6,0"/>
+                                    <Border x:Name="SwatchContainer" Width="30" Height="30" CornerRadius="8" Margin="0,0,6,0"/>
+                                    <Border x:Name="SwatchSurface" Width="30" Height="30" CornerRadius="8"
+                                            BorderBrush="{DynamicResource A7.OutlineVariant}" BorderThickness="1"/>
+                                </StackPanel>
+                                <TextBlock x:Name="PaletteHexText" Text="" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"
+                                           Margin="0,6,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </materialDesign:Card>
 
                 <!-- 版本与更新 -->
                 <StackPanel Orientation="Horizontal" Margin="4,2,0,0">
                     <TextBlock x:Name="VersionText" Text="v1.0.0" FontSize="11"
-                               Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
-                    <TextBlock Text=" · " FontSize="11" Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                               Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                    <TextBlock Text=" · " FontSize="11" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                     <TextBlock x:Name="UpdateStatusText" Text="" FontSize="11" Cursor="Hand"
-                               Foreground="{DynamicResource MaterialDesign.Brush.Primary}"
+                               Foreground="{DynamicResource A7.Primary}"
                                MouseLeftButtonUp="UpdateStatus_Click"/>
                 </StackPanel>
 
                 <TextBlock Text="关闭窗口后程序继续在任务栏托盘运行 · 左键托盘图标可再次打开"
                            FontSize="11" TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0"
-                           Foreground="{DynamicResource MaterialDesign.Brush.OnSurfaceVariant}"/>
+                           Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
             </StackPanel>
         </ScrollViewer>
     </Grid>

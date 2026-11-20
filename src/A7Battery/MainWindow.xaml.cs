@@ -14,6 +14,7 @@ public sealed partial class MainWindow : Window
     private readonly AppSettings _settings;
     private readonly BatteryMonitor _monitor;
     private readonly MouseConfigService _mouse = new();
+    private readonly App _app;
     private bool _suppressToggle;
     private UpdateInfo? _update;
 
@@ -21,6 +22,7 @@ public sealed partial class MainWindow : Window
     {
         _settings = settings;
         _monitor = monitor;
+        _app = (App)Application.Current;
         InitializeComponent();
 
         // 关闭按钮只隐藏到托盘，不销毁窗口（配合 OnExplicitShutdown）
@@ -56,6 +58,113 @@ public sealed partial class MainWindow : Window
         ActiveDpiCombo.SelectedIndex = _settings.ActiveDpiIndex;
         RateCombo.SelectedIndex = RateIndexFromHz(_settings.RateHz);
         VersionText.Text = "v" + App.AppVersion;
+
+        InitThemeUI();
+    }
+
+    // ---------- 主题取色 ----------
+
+    private static Brush Res(string key) =>
+        Application.Current.Resources[key] as Brush ?? Brushes.Transparent;
+
+    private void InitThemeUI()
+    {
+        // 生成预设色板圆点
+        PresetSwatches.Children.Clear();
+        foreach (var preset in ThemeService.Presets)
+        {
+            var color = ThemeService.ParseHex(preset.Hex);
+            var btn = new System.Windows.Controls.Button
+            {
+                Width = 30, Height = 30,
+                Margin = new Thickness(0, 0, 8, 8),
+                Cursor = System.Windows.Input.Cursors.Hand,
+                ToolTip = preset.Name + " " + preset.Hex,
+                Tag = preset.Hex,
+                Background = new SolidColorBrush(color),
+                BorderBrush = Res("A7.OutlineVariant"),
+                BorderThickness = new Thickness(1),
+                Template = MakeSwatchTemplate()
+            };
+            btn.Click += PresetColor_Click;
+            PresetSwatches.Children.Add(btn);
+        }
+        RefreshThemeUI();
+    }
+
+    private static ControlTemplate MakeSwatchTemplate()
+    {
+        var template = new ControlTemplate(typeof(System.Windows.Controls.Button));
+        var border = new FrameworkElementFactory(typeof(Border), "SwatchBd");
+        border.SetBinding(Border.BackgroundProperty, new System.Windows.Data.Binding("Background") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
+        border.SetBinding(Border.BorderBrushProperty, new System.Windows.Data.Binding("BorderBrush") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
+        border.SetBinding(Border.BorderThicknessProperty, new System.Windows.Data.Binding("BorderThickness") { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.TemplatedParent) });
+        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(15));
+        template.VisualTree = border;
+        return template;
+    }
+
+    /// <summary>根据当前设置刷新模式按钮、面板与调色板预览。</summary>
+    private void RefreshThemeUI()
+    {
+        bool dyn = _settings.ThemeMode == ThemeMode.Dynamic;
+        ThemeStaticBtn.Background = dyn ? Brush("#E7E0EC") : Res("A7.Primary");
+        ThemeStaticBtn.Foreground = dyn ? Brush("#49454F") : Brushes.White;
+        ThemeDynamicBtn.Background = dyn ? Res("A7.Primary") : Brush("#E7E0EC");
+        ThemeDynamicBtn.Foreground = dyn ? Brushes.White : Brush("#49454F");
+        StaticPalettePanel.Visibility = dyn ? Visibility.Collapsed : Visibility.Visible;
+        DynamicPalettePanel.Visibility = dyn ? Visibility.Visible : Visibility.Collapsed;
+        ThemeModeLabel.Text = dyn ? "动态 · 跟随系统" : "静态 · 预设配色";
+
+        var seed = _app.Theme.CurrentSeed;
+        SwatchPrimary.Background = Res("A7.Primary");
+        SwatchSecondary.Background = Res("A7.Secondary");
+        SwatchTertiary.Background = Res("A7.Tertiary");
+        SwatchContainer.Background = Res("A7.PrimaryContainer");
+        SwatchSurface.Background = Res("A7.Surface");
+        PaletteHexText.Text = $"种子 {ThemeService.ToHex(seed)} · 主色 {ThemeService.ToHex(((SolidColorBrush)Res("A7.Primary")).Color)}";
+        AccentSwatch.Background = new SolidColorBrush(seed);
+        AccentHexText.Text = ThemeService.ToHex(seed);
+    }
+
+    private void ApplyThemeAndRefresh(Color seed)
+    {
+        _app.Theme.Apply(seed);
+        RefreshThemeUI();
+        HighlightInterval(_settings.RefreshSeconds);
+        _app.UpdateTrayAccent();
+    }
+
+    private void ThemeStatic_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ThemeMode = ThemeMode.Static;
+        _settings.Save();
+        ApplyThemeAndRefresh(ThemeService.ParseHex(_settings.StaticSeedColor));
+    }
+
+    private void ThemeDynamic_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ThemeMode = ThemeMode.Dynamic;
+        _settings.Save();
+        ApplyThemeAndRefresh(ThemeService.ReadSystemAccent());
+    }
+
+    private void PresetColor_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.Button b && b.Tag is string hex)
+        {
+            _settings.StaticSeedColor = hex;
+            _settings.ThemeMode = ThemeMode.Static;
+            _settings.Save();
+            ApplyThemeAndRefresh(ThemeService.ParseHex(hex));
+        }
+    }
+
+    private void RefreshAccent_Click(object sender, RoutedEventArgs e)
+    {
+        _settings.ThemeMode = ThemeMode.Dynamic;
+        _settings.Save();
+        ApplyThemeAndRefresh(ThemeService.ReadSystemAccent());
     }
 
     private static int RateIndexFromHz(int hz)
@@ -69,8 +178,8 @@ public sealed partial class MainWindow : Window
         foreach (var b in new[] { Btn15, Btn30, Btn90 })
         {
             bool active = int.TryParse(b.Tag?.ToString(), out int v) && v == sec;
-            b.Background = active ? Brush("#6750A4") : Brush("#EADDFF");
-            b.Foreground = active ? Brushes.White : Brush("#49454F");
+            b.Background = active ? Res("A7.Primary") : Res("A7.SurfaceVariant");
+            b.Foreground = active ? Brushes.White : Res("A7.OnSurfaceVariant");
         }
     }
 
@@ -236,7 +345,7 @@ public sealed partial class MainWindow : Window
                 var link = new Hyperlink(new Run("有新版本 " + info.LatestVersion + "，点击查看/下载"))
                 {
                     NavigateUri = new Uri(info.HtmlUrl),
-                    Foreground = Brush("#6750A4")
+                    Foreground = Res("A7.Primary")
                 };
                 link.RequestNavigate += (_, _) =>
                 {
@@ -270,8 +379,9 @@ public sealed partial class MainWindow : Window
         if (info == null) return;
         if (info.Success && info.Percent >= 0)
         {
-            var color = info.Percent >= 50 ? "#6750A4" : info.Percent >= 20 ? "#FFC83D" : "#FF5C5C";
-            var brush = Brush(color);
+            var brush = info.Percent >= 50
+                ? Res("A7.Primary")
+                : Brush(info.Percent >= 20 ? "#FFC83D" : "#FF5C5C");
             PercentText.Text = info.Percent.ToString();
             PercentText.Foreground = brush;
             BatteryBar.Value = info.Percent;

@@ -110,6 +110,9 @@ namespace A7Battery.Services
         private IntPtr _currentIcon = IntPtr.Zero;
         private bool _disposed;
 
+        /// <summary>主题强调色（高电量时的图标颜色），由 App 在启动/换色时设置。</summary>
+        public System.Drawing.Color Accent { get; set; } = System.Drawing.Color.FromArgb(103, 80, 164);
+
         public event Action OnOpen;
         public event Action OnRefresh;
         public event Action OnToggleAutoStart;
@@ -197,7 +200,7 @@ namespace A7Battery.Services
             _currentIcon = icon;
         }
 
-        private static IntPtr BuildIcon(int? percent, bool charging)
+        private IntPtr BuildIcon(int? percent, bool charging)
         {
             using var bmp = new Bitmap(32, 32);
             using (var g = Graphics.FromImage(bmp))
@@ -205,7 +208,7 @@ namespace A7Battery.Services
                 g.Clear(Color.Transparent);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 Color color = percent.HasValue
-                    ? (percent.Value >= 50 ? Color.FromArgb(76, 194, 255) : percent.Value >= 20 ? Color.FromArgb(255, 200, 61) : Color.FromArgb(255, 92, 92))
+                    ? (percent.Value >= 50 ? Accent : percent.Value >= 20 ? Color.FromArgb(255, 200, 61) : Color.FromArgb(255, 92, 92))
                     : Color.FromArgb(120, 140, 160);
                 using var brush = new SolidBrush(color);
                 if (percent.HasValue)

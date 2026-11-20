@@ -9,12 +9,28 @@ namespace A7Battery;
 
 public sealed partial class App : Application
 {
-    public const string AppVersion = "1.2.0";
+    public const string AppVersion = "1.3.0";
 
     private AppSettings _settings = null!;
     private BatteryMonitor _monitor = null!;
     private MainWindow _window = null!;
     private NativeTrayIcon? _tray;
+
+    internal ThemeService Theme { get; } = new();
+
+    /// <summary>按当前设置应用主题取色（启动与用户在 UI 切换时共用）。</summary>
+    internal void ApplyTheme()
+    {
+        try
+        {
+            var seed = _settings.ThemeMode == ThemeMode.Dynamic
+                ? ThemeService.ReadSystemAccent()
+                : ThemeService.ParseHex(_settings.StaticSeedColor);
+            Theme.Apply(seed);
+            Log($"主题: mode={_settings.ThemeMode} seed={ThemeService.ToHex(Theme.CurrentSeed)}");
+        }
+        catch (Exception ex) { Log("主题应用失败: " + ex.Message); }
+    }
 
     internal static void Log(string msg)
     {
@@ -41,6 +57,9 @@ public sealed partial class App : Application
             var args = e.Args;
             _settings = AppSettings.Load();
             Log($"设置: StartMinimized={_settings.StartMinimized}, args=[{string.Join(",", args)}]");
+
+            // 在构造窗口前应用主题取色，保证首屏配色正确
+            ApplyTheme();
 
             _monitor = new BatteryMonitor();
             _window = new MainWindow(_settings, _monitor);
@@ -96,9 +115,26 @@ public sealed partial class App : Application
         }
     }
 
+    /// <summary>把当前主题主色同步到托盘图标。</summary>
+    internal void UpdateTrayAccent()
+    {
+        if (_tray == null) return;
+        try
+        {
+            if (Resources["A7.Primary"] is System.Windows.Media.SolidColorBrush b)
+            {
+                var c = b.Color;
+                _tray.Accent = System.Drawing.Color.FromArgb(c.R, c.G, c.B);
+                RefreshTrayIcon();
+            }
+        }
+        catch { }
+    }
+
     private void BuildTray()
     {
         _tray = new NativeTrayIcon();
+        UpdateTrayAccent();
         _tray.OnOpen += () => Dispatcher.Invoke(() => _window.ShowWindow());
         _tray.OnRefresh += () => Dispatcher.Invoke(() => _monitor.Refresh());
         _tray.OnExit += () => Dispatcher.Invoke(ExitApp);

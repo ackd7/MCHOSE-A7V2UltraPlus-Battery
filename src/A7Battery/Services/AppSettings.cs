@@ -11,6 +11,10 @@ namespace A7Battery.Services
         public bool StartMinimized { get; set; } = false;
         public bool ShowPercentInTray { get; set; } = true;
 
+        // 主题取色
+        public ThemeMode ThemeMode { get; set; } = ThemeMode.Static;
+        public string StaticSeedColor { get; set; } = "#6750A4";
+
         // 自动更新检查
         public bool CheckUpdates { get; set; } = true;
         public DateTime LastUpdateCheck { get; set; } = default;
