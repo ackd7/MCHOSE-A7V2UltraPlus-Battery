@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,7 +53,7 @@ import top.ackd7.a7battery.ui.App
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "2.0.4"
+const val APP_VERSION = "2.0.5"
 
 /** 轻量日志：写入 %LOCALAPPDATA%\A7Battery\app.log，便于排查启动异常。 */
 internal fun appLog(msg: String) {
@@ -83,6 +84,9 @@ fun main(args: Array<String>) {
         var isVisible by remember { mutableStateOf(!startMinimized) }
         // 托盘右键菜单（Compose 自绘窗口，规避 AWT 菜单中文乱码）
         var menuVisible by remember { mutableStateOf(false) }
+        // 每次「从托盘打开」都自增，强制在 AWT 层把窗口恢复出来
+        // （只靠 isVisible 布尔值不够：窗口被最小化时 isVisible 仍是 true，置 true 是空操作）
+        var showToken by remember { mutableIntStateOf(0) }
 
         val windowState = rememberWindowState(size = DpSize(420.dp, 720.dp))
         val menuState = rememberWindowState(size = DpSize(180.dp, 148.dp))
@@ -92,7 +96,7 @@ fun main(args: Array<String>) {
             try {
                 val t = NativeTrayIcon()
                 t.accent = java.awt.Color(0x34, 0x82, 0xFF)
-                t.onOpen = { menuVisible = false; isVisible = true }
+                t.onOpen = { menuVisible = false; isVisible = true; showToken++ }
                 t.onMenu = { menuVisible = !menuVisible }
                 t.onRefresh = { monitor.refresh() }
                 t.onExit = {
@@ -164,6 +168,44 @@ fun main(args: Array<String>) {
                 runCatching { applyRoundedCorners(win) }
                 // 去掉 Swing 默认边框，避免无边框窗口右/下缘出现一条细线
                 runCatching { win.rootPane.border = null }
+
+                // 记录窗口状态变化，便于排查「界面消失」类问题
+                win.addWindowStateListener { e ->
+                    appLog("窗口状态变化: ${e.oldState} -> ${e.newState}")
+                }
+                win.addWindowListener(object : java.awt.event.WindowAdapter() {
+                    override fun windowIconified(e: java.awt.event.WindowEvent?) {
+                        appLog("窗口被最小化（iconified）")
+                    }
+
+                    override fun windowDeiconified(e: java.awt.event.WindowEvent?) {
+                        appLog("窗口已还原（deiconified）")
+                    }
+                })
+            }
+
+            // 开发用：模拟「窗口被最小化后从托盘打开」，验证恢复逻辑
+            LaunchedEffect(Unit) {
+                if (args.contains("--test-restore")) {
+                    kotlinx.coroutines.delay(2500)
+                    appLog("测试：手动最小化窗口")
+                    win.isMinimized = true
+                    kotlinx.coroutines.delay(1500)
+                    appLog("测试：模拟点击托盘打开")
+                    isVisible = true
+                    showToken++
+                }
+            }
+
+            // 从托盘打开时强制恢复（含取消最小化 / 置前 / 抢焦点）
+            LaunchedEffect(showToken) {
+                if (showToken == 0) return@LaunchedEffect
+                win.isMinimized = false
+                ensureOnScreen(win)
+                win.isVisible = true
+                win.toFront()
+                win.requestFocus()
+                appLog("托盘恢复窗口 #$showToken（minimized=${win.isMinimized}, visible=${win.isVisible}）")
             }
 
             // 开发用：--screenshot 时把本窗口截图存到临时目录（便于无交互验证 UI）
@@ -195,13 +237,20 @@ fun main(args: Array<String>) {
                         title = "A7 电量助手",
                         subtitle = "v$APP_VERSION",
                         isMaximized = isMax,
-                        onMinimize = { win.isMinimized = true },
+                        onMinimize = {
+                            // 这是个托盘工具：最小化 = 收起窗口，托盘图标仍在
+                            appLog("点击最小化 → 收起窗口")
+                            isVisible = false
+                        },
                         onToggleMaximize = {
                             isMax = !isMax
                             win.extendedState =
                                 if (isMax) java.awt.Frame.NORMAL else java.awt.Frame.MAXIMIZED_BOTH
                         },
-                        onClose = { isVisible = false },
+                        onClose = {
+                            appLog("点击关闭 → 隐藏窗口")
+                            isVisible = false
+                        },
                     )
                 },
                 onExitRequested = {
@@ -417,6 +466,20 @@ private interface DwmApi : com.sun.jna.Library {
         pvAttribute: com.sun.jna.ptr.IntByReference,
         cbAttribute: Int,
     ): Int
+}
+
+/** 若窗口被拖到所有屏幕之外，拉回主屏居中（否则「打开面板」看起来像没反应）。 */
+private fun ensureOnScreen(w: java.awt.Window) {
+    runCatching {
+        val screens = java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment()
+            .screenDevices.map { it.defaultConfiguration.bounds }
+        if (screens.any { it.intersects(w.bounds) }) return
+        val p = screens.firstOrNull() ?: return
+        w.setLocation(
+            p.x + (p.width - w.width) / 2,
+            p.y + (p.height - w.height) / 2,
+        )
+    }
 }
 
 /** 给无边框窗口加 Windows 11 圆角（失败不影响功能）。 */

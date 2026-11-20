@@ -57,11 +57,19 @@ jobs:
           .\gradlew.bat :app:compileKotlinDesktop --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath build-log.txt
           exit $LASTEXITCODE
 
-      - name: 打包桌面分发（MSI + EXE）
+      - name: 打包桌面分发（MSI）
         shell: pwsh
         run: |
           .\gradlew.bat :app:packageDistributionForCurrentOS -PappVersion="${{ steps.version.outputs.version }}" --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath package-log.txt
           exit $LASTEXITCODE
+
+      - name: 生成安装向导（NSIS，中文，可选桌面快捷方式）
+        shell: pwsh
+        run: |
+          choco install nsis -y --no-progress --limit-output
+          $env:Path += ";C:\Program Files (x86)\NSIS"
+          makensis /DAPP_VERSION="${{ steps.version.outputs.version }}" installer\setup.nsi
+          Get-ChildItem dist | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
       - name: 上传构建日志（失败时）
         if: failure()
@@ -87,16 +95,17 @@ jobs:
             A7 电量助手（Compose Desktop + miuix 版）
 
             ## 下载
-            - **安装包**：`A7Battery-${{ steps.version.outputs.version }}.msi`
-            - **便携版**：`A7Battery-${{ steps.version.outputs.version }}.exe`（或对应 zip）
+            - **推荐**：`A7Battery-Setup-${{ steps.version.outputs.version }}.exe`
+              中文安装向导，安装时可勾选「创建桌面快捷方式」「开机自动启动」，按当前用户安装、无需管理员权限。
+            - **备用**：`A7Battery-${{ steps.version.outputs.version }}.msi`（Windows Installer，英文向导）
 
             ## 说明
-            - 基于 Compose Multiplatform + miuix（MIUI/HyperOS 设计语言）
-            - 免安装、免运行时，双击运行即显示主窗口，关闭后驻留托盘
-            - 支持迈从 MCHOSE A7 V2 Ultra+ 精确电量、DPI/回报率写入
+            - 界面参考 [mochi-compose](https://github.com/feice11/mochi-compose)：iOS 式分组卡片 + 悬浮胶囊标签栏
+            - 免安装运行时，安装包自带 JRE
+            - 支持迈从 MCHOSE A7 V2 Ultra+ 精确电量、DPI/回报率读写
           files: |
+            dist/*.exe
             app/build/compose/binaries/**/*.msi
-            app/build/compose/binaries/**/*.exe
             app/build/compose/binaries/**/*.zip
           draft: false
           prerelease: false

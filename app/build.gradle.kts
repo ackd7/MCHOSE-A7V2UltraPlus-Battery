@@ -11,7 +11,7 @@ plugins {
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突
 val appVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "2.0.4"
+    ?: "2.0.5"
 
 kotlin {
     jvm("desktop")
@@ -53,13 +53,17 @@ compose.desktop {
         jvmArgs += listOf("--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8")
 
         nativeDistributions {
-            targetFormats(TargetFormat.Msi, TargetFormat.Exe)
+            // MSI 作为备用安装包；主推 dist 里的 NSIS Setup（中文向导，可选桌面快捷方式）
+            targetFormats(TargetFormat.Msi)
             packageName = "A7Battery"
             packageVersion = appVersion
 
             windows {
                 // 注意：menuGroup 不用中文，避免 GitHub Actions Windows runner 编码乱码导致打包失败
                 menuGroup = "A7Battery"
+                // MSI 安装时创建开始菜单与桌面快捷方式
+                menu = true
+                shortcut = true
                 // 图标：沿用原 Assets/app.ico
                 iconFile.set(project.file("src/desktopMain/resources/app.ico"))
                 upgradeUuid = "8f3a1e2c-4b5d-4a6b-8c9e-0f1a2b3c4d5e"
