@@ -41,55 +41,78 @@ import top.ackd7.a7battery.services.ConnectionMode
 import top.ackd7.a7battery.services.MouseConfigService
 import top.ackd7.a7battery.services.UpdateInfo
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTitle
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.TabRow
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-private val PageTabs = listOf("电量", "鼠标", "设置")
+/** 内容区底部留白，避免被悬浮导航栏挡住。 */
+private val BottomInset = 104.dp
 
 /**
- * 主界面：三个页面（电量 / 鼠标 / 设置），用 TabRow 切换。
+ * 主界面：三页（电量 / 鼠标 / 设置），底部悬浮导航栏切换（miuix 风格）。
+ * 标题栏由外部传入，便于把窗口的最小化 / 最大化 / 关闭按钮做进 UI。
  */
 @Composable
 fun App(
     settings: AppSettings,
     monitor: BatteryMonitor,
+    battery: BatteryInfo,
     updateInfo: UpdateInfo,
+    titleBar: @Composable () -> Unit,
     onExitRequested: () -> Unit,
 ) {
     AppTheme {
-        var battery by remember { mutableStateOf(BatteryInfo()) }
         var page by remember { mutableIntStateOf(0) }
 
-        LaunchedEffect(Unit) {
-            top.ackd7.a7battery.appLog("UI 已组合（页面数=${PageTabs.size}）")
-            monitor.onReadingChanged = { info -> battery = info }
-        }
+        LaunchedEffect(Unit) { top.ackd7.a7battery.appLog("UI 已组合（悬浮导航 + 三页）") }
 
         Scaffold(
-            topBar = {
-                SmallTopAppBar(title = "A7 电量助手", subtitle = "v$APP_VERSION")
-            },
+            modifier = Modifier.fillMaxSize(),
+            topBar = { titleBar() },
+            containerColor = MiuixTheme.colorScheme.background,
         ) { innerPadding ->
-            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-                TabRow(
-                    tabs = PageTabs,
-                    selectedTabIndex = page,
-                    onTabSelected = { page = it },
-                )
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
                 when (page) {
                     0 -> BatteryPage(settings, monitor, battery)
                     1 -> MousePage(settings)
                     else -> SettingsPage(settings, updateInfo, onExitRequested)
+                }
+
+                FloatingNavigationBar(
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
+                ) {
+                    FloatingNavigationBarItem(
+                        selected = page == 0,
+                        onClick = { page = 0 },
+                        icon = MiuixIcons.Home,
+                        label = "电量",
+                    )
+                    FloatingNavigationBarItem(
+                        selected = page == 1,
+                        onClick = { page = 1 },
+                        icon = MiuixIcons.Tune,
+                        label = "鼠标",
+                    )
+                    FloatingNavigationBarItem(
+                        selected = page == 2,
+                        onClick = { page = 2 },
+                        icon = MiuixIcons.Settings,
+                        label = "设置",
+                    )
                 }
             }
         }
@@ -109,7 +132,7 @@ private fun BatteryPage(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = BottomInset),
     ) {
         item {
             Spacer(Modifier.height(8.dp))
@@ -118,15 +141,16 @@ private fun BatteryPage(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    val ok = battery.success && battery.percent >= 0
                     val percentColor = when {
-                        !battery.success || battery.percent < 0 -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        !ok -> MiuixTheme.colorScheme.onSurfaceVariantSummary
                         battery.percent >= 50 -> primary
                         battery.percent >= 20 -> Color(0xFFFFC83D)
                         else -> Color(0xFFFF5C5C)
                     }
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(
-                            text = if (battery.success && battery.percent >= 0) "${battery.percent}" else "--",
+                            text = if (ok) "${battery.percent}" else "--",
                             fontSize = 76.sp,
                             color = percentColor,
                         )
@@ -143,7 +167,7 @@ private fun BatteryPage(
                         modifier = Modifier.fillMaxWidth().height(8.dp)
                             .background(MiuixTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(4.dp)),
                     ) {
-                        val frac = if (battery.success && battery.percent > 0) battery.percent / 100f else 0f
+                        val frac = if (ok && battery.percent > 0) battery.percent / 100f else 0f
                         Box(
                             modifier = Modifier.fillMaxWidth(frac).height(8.dp)
                                 .background(percentColor, RoundedCornerShape(4.dp)),
@@ -223,7 +247,6 @@ private fun BatteryPage(
                     Spacer(Modifier.height(10.dp))
                 }
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -327,7 +350,7 @@ private fun MousePage(settings: AppSettings) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = BottomInset),
     ) {
         item {
             Spacer(Modifier.height(8.dp))
@@ -418,7 +441,6 @@ private fun MousePage(settings: AppSettings) {
                     )
                 }
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }
@@ -437,7 +459,7 @@ private fun SettingsPage(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = BottomInset),
     ) {
         item {
             Spacer(Modifier.height(8.dp))
@@ -482,10 +504,7 @@ private fun SettingsPage(
             SmallTitle("关于")
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                    ArrowPreference(
-                        title = "版本",
-                        summary = "v$APP_VERSION",
-                    )
+                    ArrowPreference(title = "版本", summary = "v$APP_VERSION")
                     if (updateInfo.available && updateInfo.latestVersion.isNotBlank()) {
                         ArrowPreference(
                             title = "发现新版本 ${updateInfo.latestVersion}",
@@ -510,7 +529,6 @@ private fun SettingsPage(
                     modifier = Modifier.fillMaxWidth().padding(8.dp),
                 )
             }
-            Spacer(Modifier.height(24.dp))
         }
     }
 }

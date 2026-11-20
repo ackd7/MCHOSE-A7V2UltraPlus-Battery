@@ -3,9 +3,6 @@ package top.ackd7.a7battery.services
 import java.awt.Color
 import java.awt.Font
 import java.awt.Graphics2D
-import java.awt.GraphicsEnvironment
-import java.awt.MenuItem
-import java.awt.PopupMenu
 import java.awt.RenderingHints
 import java.awt.SystemTray
 import java.awt.TrayIcon
@@ -16,9 +13,9 @@ import java.awt.image.BufferedImage
 /**
  * 原生托盘图标（基于 JDK 内置 java.awt.SystemTray）。
  *
- * 相比手写 Shell_NotifyIcon（JNA），SystemTray 由 JVM 维护消息循环，
- * 与 Compose Desktop 的 AWT 事件线程天然集成，稳定可靠。
- * 支持动态绘制电量百分比、左键回调、右键菜单回调。
+ * 说明：右键菜单不再使用 AWT 的 PopupMenu —— 在 jpackage 裁剪过的 JRE 里
+ * AWT 菜单会回落到不含中文字形的原生字体，中文会显示成方块（实测 getFont() 为 null）。
+ * 这里只负责图标与点击事件，右键菜单由 Compose 自绘窗口实现（Skia 渲染中文正常）。
  */
 class NativeTrayIcon : AutoCloseable {
 
@@ -28,6 +25,7 @@ class NativeTrayIcon : AutoCloseable {
     var accent: Color = Color(0x34, 0x82, 0xFF)
 
     var onOpen: (() -> Unit)? = null
+    var onMenu: (() -> Unit)? = null
     var onRefresh: (() -> Unit)? = null
     var onExit: (() -> Unit)? = null
 
@@ -39,45 +37,16 @@ class NativeTrayIcon : AutoCloseable {
         trayIcon.isImageAutoSize = true
         trayIcon.toolTip = "A7 电量助手"
 
-        // 左键点击打开面板
         trayIcon.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                if (e.button == MouseEvent.BUTTON1 && e.clickCount == 1) {
-                    onOpen?.invoke()
+                when (e.button) {
+                    MouseEvent.BUTTON1 -> onOpen?.invoke()
+                    MouseEvent.BUTTON3 -> onMenu?.invoke()
                 }
             }
         })
 
-        // 右键菜单
-        // 注意：AWT 的 PopupMenu 默认字体（getFont() == null）在裁剪过的 JRE 里
-        // 会回落到不含中文字形的原生字体，菜单中文会显示成方块。
-        // 这里显式指定一个能显示中文的字体。
-        val menuFont = cjkFont(12)
-        val menu = PopupMenu().apply { font = menuFont }
-        val itemOpen = MenuItem("打开面板").apply { font = menuFont; addActionListener { onOpen?.invoke() } }
-        val itemRefresh = MenuItem("立即刷新").apply { font = menuFont; addActionListener { onRefresh?.invoke() } }
-        val itemExit = MenuItem("退出").apply { font = menuFont; addActionListener { onExit?.invoke() } }
-        menu.add(itemOpen)
-        menu.add(itemRefresh)
-        menu.addSeparator()
-        menu.add(itemExit)
-        trayIcon.popupMenu = menu
-
         SystemTray.getSystemTray().add(trayIcon)
-    }
-
-    /** 选一个能显示中文的字体（优先微软雅黑）。 */
-    private fun cjkFont(size: Int): Font {
-        val candidates = listOf("Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "SimSun", "Dialog")
-        val available = runCatching {
-            GraphicsEnvironment.getLocalGraphicsEnvironment().availableFontFamilyNames.toSet()
-        }.getOrDefault(emptySet())
-        for (name in candidates) {
-            if (name != "Dialog" && name !in available) continue
-            val f = Font(name, Font.PLAIN, size)
-            if (f.canDisplay('打')) return f
-        }
-        return Font(Font.DIALOG, Font.PLAIN, size)
     }
 
     fun setIcon(percent: Int?, charging: Boolean, tip: String) {
@@ -101,18 +70,20 @@ class NativeTrayIcon : AutoCloseable {
         g.color = color
         g.fillRoundRect(1, 5, 30, 22, 10, 10)
 
+        g.color = Color.WHITE
         if (percent != null) {
-            g.color = Color.WHITE
-            g.font = Font("Segoe UI", Font.BOLD, 13)
+            g.font = Font(Font.SANS_SERIF, Font.BOLD, 13)
             drawCentered(g, percent.toString(), 1, 5, 30, 22)
             if (charging) {
-                g.font = Font("Segoe UI Symbol", Font.BOLD, 9)
-                g.color = Color.YELLOW
-                g.drawString("⚡", 22, 16)
+                // 手绘小闪电，避免依赖符号字体（裁剪 JRE 可能缺字形）
+                g.fillPolygon(
+                    intArrayOf(26, 22, 25, 24, 28, 25),
+                    intArrayOf(8, 15, 15, 21, 13, 13),
+                    6,
+                )
             }
         } else {
-            g.color = Color.WHITE
-            g.font = Font("Segoe UI", Font.BOLD, 10)
+            g.font = Font(Font.SANS_SERIF, Font.BOLD, 10)
             drawCentered(g, "A7", 1, 5, 30, 22)
         }
         g.dispose()
