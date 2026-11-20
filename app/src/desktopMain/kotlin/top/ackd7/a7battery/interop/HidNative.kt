@@ -10,6 +10,7 @@ import com.sun.jna.platform.win32.WinBase
 import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinNT
 import com.sun.jna.ptr.IntByReference
+import com.sun.jna.ptr.PointerByReference
 import java.util.Collections
 
 /**
@@ -141,8 +142,6 @@ object HidNative {
         fun ResetEvent(hEvent: WinNT.HANDLE): Boolean
         fun WaitForSingleObject(hHandle: WinNT.HANDLE, dwMilliseconds: Int): Int
     }
-
-    class PointerByReference : com.sun.jna.ptr.PointerByReference()
 
     private val hid: HidDll = Native.load("hid", HidDll::class.java)
     private val setupapi: SetupApi = Native.load("setupapi", SetupApi::class.java)

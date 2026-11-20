@@ -3,6 +3,7 @@ package top.ackd7.a7battery
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
@@ -28,7 +29,7 @@ fun main(args: Array<String>) {
         // 保存主窗口引用，供托盘回调重新显示窗口
         var mainWindow: Window? = null
 
-        val windowState = rememberWindowState(width = 420.dp, height = 720.dp)
+        val windowState = rememberWindowState(size = DpSize(420.dp, 720.dp))
 
         Window(
             onCloseRequest = {

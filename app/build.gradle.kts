@@ -39,6 +39,11 @@ kotlin {
     }
 }
 
+// 版本号：优先取 -Pversion=xxx，其次取环境变量 APP_VERSION，默认 2.0.0
+val appVersion: String = (project.findProperty("version") as String?)
+    ?: System.getenv("APP_VERSION")
+    ?: "2.0.0"
+
 compose.desktop {
     application {
         mainClass = "top.ackd7.a7battery.MainKt"
@@ -46,7 +51,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe)
             packageName = "A7Battery"
-            packageVersion = "2.0.0"
+            packageVersion = appVersion
 
             windows {
                 menuGroup = "A7 电量助手"
