@@ -3,13 +3,14 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 using A7Battery.Services;
 
 namespace A7Battery;
 
 public sealed partial class App : Application
 {
-    public const string AppVersion = "1.3.0";
+    public const string AppVersion = "1.4.0";
 
     private AppSettings _settings = null!;
     private BatteryMonitor _monitor = null!;
@@ -18,16 +19,28 @@ public sealed partial class App : Application
 
     internal ThemeService Theme { get; } = new();
 
+    /// <summary>当前取色来源描述（壁纸文件名 / 系统强调色 / 预设）。</summary>
+    internal string ThemeSource { get; private set; } = "预设";
+
     /// <summary>按当前设置应用主题取色（启动与用户在 UI 切换时共用）。</summary>
     internal void ApplyTheme()
     {
         try
         {
-            var seed = _settings.ThemeMode == ThemeMode.Dynamic
-                ? ThemeService.ReadSystemAccent()
-                : ThemeService.ParseHex(_settings.StaticSeedColor);
+            Color seed;
+            if (_settings.ThemeMode == ThemeMode.Dynamic)
+            {
+                var (color, source) = ThemeService.ReadDynamicSeed();
+                seed = color;
+                ThemeSource = source;
+            }
+            else
+            {
+                seed = ThemeService.ParseHex(_settings.StaticSeedColor);
+                ThemeSource = "预设 · " + _settings.StaticSeedColor;
+            }
             Theme.Apply(seed);
-            Log($"主题: mode={_settings.ThemeMode} seed={ThemeService.ToHex(Theme.CurrentSeed)}");
+            Log($"主题: mode={_settings.ThemeMode} source={ThemeSource} seed={ThemeService.ToHex(Theme.CurrentSeed)}");
         }
         catch (Exception ex) { Log("主题应用失败: " + ex.Message); }
     }

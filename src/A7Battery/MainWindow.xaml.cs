@@ -17,6 +17,12 @@ public sealed partial class MainWindow : Window
     private readonly App _app;
     private bool _suppressToggle;
     private UpdateInfo? _update;
+    private int _activeDpiIndex = 2;
+    private int _selectedRateIndex = 2;
+
+    private TextBox[] DpiBoxes => new[] { Dpi0, Dpi1, Dpi2, Dpi3, Dpi4, Dpi5 };
+    private Border[] DpiChips => new[] { DpiChip0, DpiChip1, DpiChip2, DpiChip3, DpiChip4, DpiChip5 };
+    private Button[] RateButtons => new[] { RateBtn0, RateBtn1, RateBtn2, RateBtn3, RateBtn4, RateBtn5 };
 
     public MainWindow(AppSettings settings, BatteryMonitor monitor)
     {
@@ -53,10 +59,12 @@ public sealed partial class MainWindow : Window
         HighlightInterval(_settings.RefreshSeconds);
 
         // 本地记忆的鼠标配置填入输入框
-        var dpis = new[] { Dpi0, Dpi1, Dpi2, Dpi3, Dpi4, Dpi5 };
-        for (int i = 0; i < 6; i++) dpis[i].Text = _settings.DpiStages[i].ToString();
-        ActiveDpiCombo.SelectedIndex = _settings.ActiveDpiIndex;
-        RateCombo.SelectedIndex = RateIndexFromHz(_settings.RateHz);
+        for (int i = 0; i < 6; i++) DpiBoxes[i].Text = _settings.DpiStages[i].ToString();
+        _activeDpiIndex = _settings.ActiveDpiIndex;
+        _selectedRateIndex = RateIndexFromHz(_settings.RateHz);
+        HighlightDpiStages();
+        HighlightRate();
+        UpdateActiveStageText();
         VersionText.Text = "v" + App.AppVersion;
 
         InitThemeUI();
@@ -124,15 +132,23 @@ public sealed partial class MainWindow : Window
         SwatchSurface.Background = Res("A7.Surface");
         PaletteHexText.Text = $"种子 {ThemeService.ToHex(seed)} · 主色 {ThemeService.ToHex(((SolidColorBrush)Res("A7.Primary")).Color)}";
         AccentSwatch.Background = new SolidColorBrush(seed);
-        AccentHexText.Text = ThemeService.ToHex(seed);
+        AccentHexText.Text = ThemeService.ToHex(seed) + " · " + _app.ThemeSource;
     }
 
     private void ApplyThemeAndRefresh(Color seed)
     {
         _app.Theme.Apply(seed);
         RefreshThemeUI();
-        HighlightInterval(_settings.RefreshSeconds);
+        RefreshDynamicHighlights();
         _app.UpdateTrayAccent();
+    }
+
+    /// <summary>主题色变化后刷新所有依赖动态画刷的高亮状态。</summary>
+    private void RefreshDynamicHighlights()
+    {
+        HighlightInterval(_settings.RefreshSeconds);
+        HighlightDpiStages();
+        HighlightRate();
     }
 
     private void ThemeStatic_Click(object sender, RoutedEventArgs e)
@@ -146,7 +162,8 @@ public sealed partial class MainWindow : Window
     {
         _settings.ThemeMode = ThemeMode.Dynamic;
         _settings.Save();
-        ApplyThemeAndRefresh(ThemeService.ReadSystemAccent());
+        _app.ApplyTheme();
+        AfterThemeApplied();
     }
 
     private void PresetColor_Click(object sender, RoutedEventArgs e)
@@ -164,7 +181,16 @@ public sealed partial class MainWindow : Window
     {
         _settings.ThemeMode = ThemeMode.Dynamic;
         _settings.Save();
-        ApplyThemeAndRefresh(ThemeService.ReadSystemAccent());
+        _app.ApplyTheme();
+        AfterThemeApplied();
+    }
+
+    /// <summary>主题已由 App 应用（含取色来源），统一刷新 UI、间隔高亮与托盘。</summary>
+    private void AfterThemeApplied()
+    {
+        RefreshThemeUI();
+        RefreshDynamicHighlights();
+        _app.UpdateTrayAccent();
     }
 
     private static int RateIndexFromHz(int hz)
@@ -221,6 +247,52 @@ public sealed partial class MainWindow : Window
 
     // ---------- 鼠标 DPI / 回报率 ----------
 
+    private void HighlightDpiStages()
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            bool active = i == _activeDpiIndex;
+            DpiChips[i].Background = active ? Res("A7.PrimaryContainer") : Res("A7.SurfaceContainer");
+            DpiChips[i].BorderBrush = active ? Res("A7.Primary") : Brushes.Transparent;
+            DpiChips[i].BorderThickness = active ? new Thickness(1.5) : new Thickness(0);
+        }
+        UpdateActiveStageText();
+    }
+
+    private void HighlightRate()
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            bool active = i == _selectedRateIndex;
+            RateButtons[i].Background = active ? Res("A7.Primary") : Res("A7.SurfaceContainer");
+            RateButtons[i].Foreground = active ? Brushes.White : Res("A7.OnSurfaceVariant");
+        }
+    }
+
+    private void UpdateActiveStageText()
+    {
+        string val = DpiBoxes[_activeDpiIndex].Text.Trim();
+        ActiveStageText.Text = $"档位 {_activeDpiIndex + 1} · {val} DPI";
+    }
+
+    private void DpiStage_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && int.TryParse(b.Tag?.ToString(), out int idx) && idx >= 0 && idx < 6)
+        {
+            _activeDpiIndex = idx;
+            HighlightDpiStages();
+        }
+    }
+
+    private void RateBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button b && int.TryParse(b.Tag?.ToString(), out int idx) && idx >= 0 && idx < 6)
+        {
+            _selectedRateIndex = idx;
+            HighlightRate();
+        }
+    }
+
     private void ReadMouse_Click(object sender, RoutedEventArgs e)
     {
         ReadMouseBtn.IsEnabled = false;
@@ -236,15 +308,15 @@ public sealed partial class MainWindow : Window
                     MouseStatusText.Text = "读取失败：" + cfg.Error;
                     return;
                 }
-                var dpis = new[] { Dpi0, Dpi1, Dpi2, Dpi3, Dpi4, Dpi5 };
-                for (int i = 0; i < 6; i++) dpis[i].Text = cfg.DpiStages[i].ToString();
-                if (cfg.ActiveDpiIndex >= 0) ActiveDpiCombo.SelectedIndex = cfg.ActiveDpiIndex;
+                for (int i = 0; i < 6; i++) DpiBoxes[i].Text = cfg.DpiStages[i].ToString();
+                if (cfg.ActiveDpiIndex >= 0 && cfg.ActiveDpiIndex < 6) _activeDpiIndex = cfg.ActiveDpiIndex;
+                HighlightDpiStages();
 
                 int hz = cfg.UsbRateIndex >= 0 && cfg.UsbRateIndex < MouseConfigService.RateHz.Length
                     ? MouseConfigService.RateHz[cfg.UsbRateIndex]
                     : (cfg.WirelessRateIndex >= 0 && cfg.WirelessRateIndex < MouseConfigService.RateHz.Length
                         ? MouseConfigService.RateHz[cfg.WirelessRateIndex] : -1);
-                if (hz > 0) RateCombo.SelectedIndex = RateIndexFromHz(hz);
+                if (hz > 0) { _selectedRateIndex = RateIndexFromHz(hz); HighlightRate(); }
 
                 MouseStatusText.Text = $"已读取 · 当前档位 {cfg.ActiveDpiIndex + 1} · {MouseConfigService.RateLabel(cfg.UsbRateIndex)}"
                     + (string.IsNullOrEmpty(cfg.Raw) ? "" : "  [" + cfg.Raw + "]");
@@ -255,11 +327,10 @@ public sealed partial class MainWindow : Window
     private int[] CollectDpi(out string error)
     {
         error = "";
-        var boxes = new[] { Dpi0, Dpi1, Dpi2, Dpi3, Dpi4, Dpi5 };
         var values = new int[6];
         for (int i = 0; i < 6; i++)
         {
-            if (!int.TryParse(boxes[i].Text.Trim(), out values[i]) || values[i] < 100 || values[i] > 30000)
+            if (!int.TryParse(DpiBoxes[i].Text.Trim(), out values[i]) || values[i] < 100 || values[i] > 30000)
             {
                 error = $"档位 {i + 1} 的 DPI 需在 100–30000 之间";
                 return Array.Empty<int>();
@@ -272,7 +343,7 @@ public sealed partial class MainWindow : Window
     {
         var values = CollectDpi(out string error);
         if (values.Length == 0) { MouseStatusText.Text = error; return; }
-        int active = ActiveDpiCombo.SelectedIndex;
+        int active = _activeDpiIndex;
         ApplyDpiBtn.IsEnabled = false;
         MouseStatusText.Text = "正在写入 DPI…";
 
@@ -291,6 +362,7 @@ public sealed partial class MainWindow : Window
                     _settings.DpiStages = values;
                     _settings.ActiveDpiIndex = active;
                     _settings.Save();
+                    UpdateActiveStageText();
                     MouseStatusText.Text = $"DPI 已写入 · 当前档位 {active + 1} = {values[active]}";
                 }
                 else MouseStatusText.Text = "DPI 写入失败：" + err;
@@ -300,13 +372,8 @@ public sealed partial class MainWindow : Window
 
     private void ApplyRate_Click(object sender, RoutedEventArgs e)
     {
-        var item = RateCombo.SelectedItem as ComboBoxItem;
-        if (item?.Tag == null || !int.TryParse(item.Tag.ToString(), out int hz))
-        {
-            MouseStatusText.Text = "请选择回报率";
-            return;
-        }
-        int idx = RateIndexFromHz(hz);
+        int idx = _selectedRateIndex;
+        int hz = idx >= 0 && idx < MouseConfigService.RateHz.Length ? MouseConfigService.RateHz[idx] : 1000;
         ApplyRateBtn.IsEnabled = false;
         MouseStatusText.Text = "正在写入回报率…";
 

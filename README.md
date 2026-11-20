@@ -59,9 +59,9 @@ DPI / 回报率写入沿用同一协议族的厂商命令：
 参考 [end-4/dots-hyprland](https://github.com/end-4/dots-hyprland) 的 Material You 配色理念，界面提供两种取色模式：
 
 - **静态取色**：从 8 套预设种子色（紫罗兰、海洋蓝、青碧、森林绿、琥珀橙、玫红、靛青、石墨）中选择，配色持久保存。
-- **动态取色**：读取 Windows 系统强调色作为种子色。当 Windows 开启「设置 → 个性化 → 颜色 → 自动从壁纸选取主题色」时，强调色即来自当前壁纸——换壁纸后点「重新取色」即可让界面跟随，等价于 dots-hyprland 的 wallpaper → palette 流程。
+- **动态取色（壁纸取色）**：直接读取当前桌面壁纸图像，采样并按色相分桶加权提取代表性主色作为种子色（Wallpaper Engine 等动态壁纸同样适用）。换壁纸后点「重新取色」即可让界面跟随，正是 dots-hyprland 的 wallpaper → palette 流程。若壁纸过于暗淡/单调无法提取，会回退到 Windows 系统强调色。
 
-两种模式都会从一个种子色生成整套 MD3 语义色板（Primary / Secondary / Tertiary / Container / Surface / Outline …），实时应用到窗口、内置控件与托盘图标。色板生成使用 self-contained 的 HSL tonal 算法，无需额外依赖，切换即时生效。
+两种模式都会从一个种子色生成整套 MD3 语义色板（Primary / Secondary / Tertiary / Container / Surface / Outline …），实时应用到窗口、内置控件与托盘图标。取色与色板生成都是 self-contained 实现（System.Drawing 采样 + HSL tonal 算法），无需额外依赖，切换即时生效。
 
 ## 从源码构建
 
@@ -111,7 +111,8 @@ A7Battery/
 │   ├── Services/
 │   │   ├── MchoseBatteryReader.cs # 电量协议解析
 │   │   ├── MouseConfigService.cs # DPI / 回报率读写协议
-│   │   ├── ThemeService.cs       # Material You 动态/静态取色
+│   │   ├── ThemeService.cs       # Material You 动态/静态取色（色板生成）
+│   │   ├── WallpaperColorService.cs # 壁纸主色提取
 │   │   ├── UpdateChecker.cs      # GitHub Releases 更新检查
 │   │   ├── NativeTrayIcon.cs     # 原生托盘图标（Shell_NotifyIcon）
 │   │   ├── BatteryMonitor.cs     # 轮询调度（DispatcherTimer）

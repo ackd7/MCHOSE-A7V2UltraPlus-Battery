@@ -11,6 +11,59 @@
         TextElement.FontWeight="Regular"
         TextElement.FontSize="13">
 
+    <Window.Resources>
+        <!-- 档位数字按钮（轻量） -->
+        <Style x:Key="StageNumBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource A7.OnSurfaceVariant}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Width" Value="24"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="9" Background="{TemplateBinding Background}" HorizontalAlignment="Center">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- DPI chip 内的数值输入 -->
+        <Style x:Key="DpiBox" TargetType="TextBox">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource A7.OnSurface}"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="0,2"/>
+            <Setter Property="InputScope" Value="Number"/>
+        </Style>
+
+        <!-- 回报率分段按钮 -->
+        <Style x:Key="RateChip" TargetType="Button">
+            <Setter Property="Background" Value="{DynamicResource A7.SurfaceContainer}"/>
+            <Setter Property="Foreground" Value="{DynamicResource A7.OnSurfaceVariant}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="10" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -200,100 +253,83 @@
                                    FontSize="11" Foreground="{DynamicResource A7.OnSurfaceVariant}"
                                    Margin="0,0,0,12" TextWrapping="Wrap"/>
 
-                        <!-- DPI 档位 -->
-                        <TextBlock Text="DPI 档位（6 档，点击数字可修改）" FontSize="12"
-                                   Foreground="{DynamicResource A7.OnSurfaceVariant}" Margin="0,0,0,6"/>
-                        <UniformGrid Rows="2" Columns="3" Margin="0,0,0,6">
-                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,5" Padding="6,4">
+                        <!-- DPI 档位：6 个精致 chip，点档位号设为当前 -->
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="DPI 档位" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}" VerticalAlignment="Center"/>
+                            <TextBlock Text="点档位号设为当前 · 直接改数值" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
+                        <UniformGrid Rows="1" Columns="6" Margin="0,0,0,10">
+                            <Border x:Name="DpiChip0" Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Margin="0,0,3,0" Padding="2,6">
                                 <StackPanel>
-                                    <TextBlock Text="档位 1" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <TextBox x:Name="Dpi0" Text="400" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource A7.OnSurface}"
-                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                    <Button x:Name="StageBtn0" Content="1" Tag="0" Style="{StaticResource StageNumBtn}" Click="DpiStage_Click"/>
+                                    <TextBox x:Name="Dpi0" Text="400" Style="{StaticResource DpiBox}"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,5" Padding="6,4">
+                            <Border x:Name="DpiChip1" Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Margin="0,0,3,0" Padding="2,6">
                                 <StackPanel>
-                                    <TextBlock Text="档位 2" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <TextBox x:Name="Dpi1" Text="800" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource A7.OnSurface}"
-                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                    <Button x:Name="StageBtn1" Content="2" Tag="1" Style="{StaticResource StageNumBtn}" Click="DpiStage_Click"/>
+                                    <TextBox x:Name="Dpi1" Text="800" Style="{StaticResource DpiBox}"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,0,5" Padding="6,4">
+                            <Border x:Name="DpiChip2" Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Margin="0,0,3,0" Padding="2,6">
                                 <StackPanel>
-                                    <TextBlock Text="档位 3" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <TextBox x:Name="Dpi2" Text="1600" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource A7.OnSurface}"
-                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                    <Button x:Name="StageBtn2" Content="3" Tag="2" Style="{StaticResource StageNumBtn}" Click="DpiStage_Click"/>
+                                    <TextBox x:Name="Dpi2" Text="1600" Style="{StaticResource DpiBox}"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,0" Padding="6,4">
+                            <Border x:Name="DpiChip3" Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Margin="0,0,3,0" Padding="2,6">
                                 <StackPanel>
-                                    <TextBlock Text="档位 4" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <TextBox x:Name="Dpi3" Text="3200" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource A7.OnSurface}"
-                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                    <Button x:Name="StageBtn3" Content="4" Tag="3" Style="{StaticResource StageNumBtn}" Click="DpiStage_Click"/>
+                                    <TextBox x:Name="Dpi3" Text="3200" Style="{StaticResource DpiBox}"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,5,0" Padding="6,4">
+                            <Border x:Name="DpiChip4" Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Margin="0,0,3,0" Padding="2,6">
                                 <StackPanel>
-                                    <TextBlock Text="档位 5" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <TextBox x:Name="Dpi4" Text="6400" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource A7.OnSurface}"
-                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                    <Button x:Name="StageBtn4" Content="5" Tag="4" Style="{StaticResource StageNumBtn}" Click="DpiStage_Click"/>
+                                    <TextBox x:Name="Dpi4" Text="6400" Style="{StaticResource DpiBox}"/>
                                 </StackPanel>
                             </Border>
-                            <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Margin="0,0,0,0" Padding="6,4">
+                            <Border x:Name="DpiChip5" Background="{DynamicResource A7.SurfaceContainer}" CornerRadius="12" Margin="0,0,0,0" Padding="2,6">
                                 <StackPanel>
-                                    <TextBlock Text="档位 6" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <TextBox x:Name="Dpi5" Text="26000" FontSize="13" FontWeight="Medium"
-                                             Foreground="{DynamicResource A7.OnSurface}"
-                                             BorderThickness="0" Background="Transparent" Padding="0,2" InputScope="Number"/>
+                                    <Button x:Name="StageBtn5" Content="6" Tag="5" Style="{StaticResource StageNumBtn}" Click="DpiStage_Click"/>
+                                    <TextBox x:Name="Dpi5" Text="26000" Style="{StaticResource DpiBox}"/>
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
 
-                        <Grid Margin="0,0,0,10">
-                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                <TextBlock Text="当前档位" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
-                                           Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                <ComboBox x:Name="ActiveDpiCombo" Width="56" FontSize="12" VerticalAlignment="Center"
-                                          SelectedIndex="2">
-                                    <ComboBoxItem Content="1"/>
-                                    <ComboBoxItem Content="2"/>
-                                    <ComboBoxItem Content="3"/>
-                                    <ComboBoxItem Content="4"/>
-                                    <ComboBoxItem Content="5"/>
-                                    <ComboBoxItem Content="6"/>
-                                </ComboBox>
-                            </StackPanel>
-                            <Button x:Name="ApplyDpiBtn" Content="应用 DPI" HorizontalAlignment="Right"
-                                    Padding="12,4,12,4" FontSize="12" Click="ApplyDpi_Click"/>
+                        <Grid Margin="0,0,0,14">
+                            <TextBlock Text="当前生效档位" FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
+                            <TextBlock x:Name="ActiveStageText" Text="档位 3 · 1600 DPI" FontSize="11"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource A7.Primary}" FontWeight="SemiBold"/>
                         </Grid>
 
-                        <!-- 回报率 -->
-                        <Border Background="{DynamicResource A7.SurfaceVariant}" CornerRadius="12" Padding="10,8" Margin="0,0,0,10">
-                            <Grid>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock Text="回报率" FontSize="12" VerticalAlignment="Center" Margin="0,0,6,0"
-                                               Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
-                                    <ComboBox x:Name="RateCombo" Width="100" FontSize="12" VerticalAlignment="Center" SelectedIndex="2">
-                                        <ComboBoxItem Content="125 Hz" Tag="125"/>
-                                        <ComboBoxItem Content="500 Hz" Tag="500"/>
-                                        <ComboBoxItem Content="1000 Hz" Tag="1000"/>
-                                        <ComboBoxItem Content="2000 Hz" Tag="2000"/>
-                                        <ComboBoxItem Content="4000 Hz" Tag="4000"/>
-                                        <ComboBoxItem Content="8000 Hz" Tag="8000"/>
-                                    </ComboBox>
-                                </StackPanel>
-                                <Button x:Name="ApplyRateBtn" Content="应用回报率" HorizontalAlignment="Right"
-                                        Padding="12,4,12,4" FontSize="12" Click="ApplyRate_Click"/>
-                            </Grid>
-                        </Border>
+                        <!-- 回报率：6 个横向分段按钮 -->
+                        <Grid Margin="0,0,0,8">
+                            <TextBlock Text="回报率 (Polling Rate)" FontSize="12" Foreground="{DynamicResource A7.OnSurfaceVariant}" VerticalAlignment="Center"/>
+                            <TextBlock Text="仅 2.4G / 有线支持高回报率，蓝牙固定 1K" FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}"
+                                       HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                        </Grid>
+                        <UniformGrid Rows="1" Columns="6" Margin="0,0,0,12">
+                            <Button x:Name="RateBtn0" Content="125" Tag="0" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
+                            <Button x:Name="RateBtn1" Content="500" Tag="1" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
+                            <Button x:Name="RateBtn2" Content="1K" Tag="2" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
+                            <Button x:Name="RateBtn3" Content="2K" Tag="3" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
+                            <Button x:Name="RateBtn4" Content="4K" Tag="4" Style="{StaticResource RateChip}" Margin="0,0,3,0" Click="RateBtn_Click"/>
+                            <Button x:Name="RateBtn5" Content="8K" Tag="5" Style="{StaticResource RateChip}" Margin="0,0,0,0" Click="RateBtn_Click"/>
+                        </UniformGrid>
 
-                        <TextBlock Text="设置写入鼠标板载配置，切换连接或重启后依然生效。仅 2.4G / 有线支持高回报率，蓝牙固定 1K。"
-                                   FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}" TextWrapping="Wrap"/>
+                        <Grid>
+                            <Button x:Name="ApplyDpiBtn" Content="应用 DPI" HorizontalAlignment="Left"
+                                    Padding="16,4,16,4" FontSize="12" Click="ApplyDpi_Click"/>
+                            <Button x:Name="ApplyRateBtn" Content="应用回报率" HorizontalAlignment="Right"
+                                    Padding="16,4,16,4" FontSize="12" Click="ApplyRate_Click"/>
+                        </Grid>
+
+                        <TextBlock Text="设置写入鼠标板载配置，切换连接或重启后依然生效。"
+                                   FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </materialDesign:Card>
 
@@ -337,14 +373,14 @@
                                             Background="{DynamicResource A7.Primary}" BorderBrush="{DynamicResource A7.OutlineVariant}"
                                             BorderThickness="1" Margin="0,0,8,0"/>
                                     <StackPanel>
-                                        <TextBlock Text="跟随 Windows 强调色" FontSize="12" Foreground="{DynamicResource A7.OnSurface}"/>
+                                        <TextBlock Text="跟随桌面壁纸颜色" FontSize="12" Foreground="{DynamicResource A7.OnSurface}"/>
                                         <TextBlock x:Name="AccentHexText" Text="" FontSize="11" Foreground="{DynamicResource A7.OnSurfaceVariant}"/>
                                     </StackPanel>
                                 </StackPanel>
                                 <Button x:Name="RefreshAccentBtn" Content="重新取色" Click="RefreshAccent_Click"
                                         HorizontalAlignment="Right" Padding="12,4,12,4" FontSize="12"/>
                             </Grid>
-                            <TextBlock Text="开启 Windows「自动从壁纸取色」后，这里会随壁纸变化。"
+                            <TextBlock Text="从当前壁纸提取主色（Wallpaper Engine 等动态壁纸同样适用）。换壁纸后点“重新取色”即可。"
                                        FontSize="10" Foreground="{DynamicResource A7.OnSurfaceVariant}" TextWrapping="Wrap"/>
                         </StackPanel>
 

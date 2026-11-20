@@ -104,7 +104,23 @@ namespace A7Battery.Services
             Set(r, "A7.OutlineVariant", Tone(h, 0.06, 80));
         }
 
-        /// <summary>读取 Windows 系统强调色作为动态种子色。</summary>
+        /// <summary>
+        /// 动态取色：优先从当前壁纸提取主色（Material You 的 wallpaper→palette），
+        /// 失败则回退 Windows 系统强调色。返回实际种子色与来源描述。
+        /// </summary>
+        public static (Color Color, string Source) ReadDynamicSeed()
+        {
+            try
+            {
+                var wp = new WallpaperColorService().Extract();
+                if (wp != null)
+                    return (wp.Color, "壁纸 · " + (string.IsNullOrEmpty(wp.FileName) ? "当前桌面" : wp.FileName));
+            }
+            catch { }
+            return (ReadSystemAccent(), "系统强调色");
+        }
+
+        /// <summary>读取 Windows 系统强调色作为动态种子色（回退路径）。</summary>
         public static Color ReadSystemAccent()
         {
             // 优先：WPF 暴露的 DWM 玻璃色（即强调色）
