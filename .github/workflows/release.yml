@@ -68,7 +68,10 @@ jobs:
         run: |
           choco install nsis -y --no-progress --limit-output
           $env:Path += ";C:\Program Files (x86)\NSIS"
-          makensis /DAPP_VERSION="${{ steps.version.outputs.version }}" installer\setup.nsi
+          # NSIS 不会自动创建输出目录
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          makensis -V3 /DAPP_VERSION="${{ steps.version.outputs.version }}" installer\setup.nsi 2>&1 | Tee-Object -FilePath nsis-log.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem dist | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
       - name: 上传构建日志（失败时）
@@ -79,6 +82,7 @@ jobs:
           path: |
             build-log.txt
             package-log.txt
+            nsis-log.txt
 
       - name: 列出产物
         shell: pwsh
