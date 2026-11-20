@@ -45,10 +45,26 @@ jobs:
           echo "version=$ver" >> $env:GITHUB_OUTPUT
           Write-Host "版本号: $ver"
 
+      - name: 编译检查（暴露编译错误）
+        shell: pwsh
+        run: |
+          .\gradlew.bat :app:compileKotlinDesktop --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath build-log.txt
+          exit $LASTEXITCODE
+
       - name: 打包桌面分发（MSI + EXE）
         shell: pwsh
         run: |
-          .\gradlew.bat :app:packageDistributionForCurrentOS -Pversion="${{ steps.version.outputs.version }}" --no-daemon
+          .\gradlew.bat :app:packageDistributionForCurrentOS -Pversion="${{ steps.version.outputs.version }}" --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath package-log.txt
+          exit $LASTEXITCODE
+
+      - name: 上传构建日志（失败时）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            build-log.txt
+            package-log.txt
 
       - name: 列出产物
         shell: pwsh
