@@ -156,10 +156,31 @@ fun App(
 
         LaunchedEffect(Unit) {
             top.ackd7.mchose.appLog("UI 已组合（Miuix × Mochi）")
-            mouseState.refresh()
+            mouseState.refresh(battery.mode)
         }
 
-        LaunchedEffect(page) { top.ackd7.mchose.appLog("切换到页面 $page") }
+        // 开机时鼠标可能处于休眠导致首次读取失败：鼠标唤醒上线或有线/无线模式切换时自动补读一次配置
+        var syncedMode by remember { mutableStateOf(ConnectionMode.Unknown) }
+        LaunchedEffect(battery.success, battery.stale, battery.mode) {
+            if (battery.success && !battery.stale) {
+                val modeChanged = syncedMode != ConnectionMode.Unknown &&
+                    battery.mode != ConnectionMode.Unknown &&
+                    battery.mode != syncedMode
+                if ((!mouseState.loaded || modeChanged) && !mouseState.busy) {
+                    syncedMode = battery.mode
+                    mouseState.refresh(battery.mode)
+                } else if (mouseState.loaded && syncedMode == ConnectionMode.Unknown && battery.mode != ConnectionMode.Unknown) {
+                    syncedMode = battery.mode
+                }
+            }
+        }
+
+        LaunchedEffect(page) {
+            top.ackd7.mchose.appLog("切换到页面 $page")
+            if (page == 1 && !mouseState.loaded && !mouseState.busy) {
+                mouseState.refresh(battery.mode)
+            }
+        }
 
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -206,7 +227,7 @@ fun App(
                             ) {
                                 when (p) {
                                     0 -> BatteryPage(settings, monitor, battery, wide)
-                                    1 -> MousePage(mouseState, wide)
+                                    1 -> MousePage(mouseState, battery.mode, wide)
                                     else -> SettingsPage(
                                         settings = settings,
                                         updateInfo = updateInfo,
@@ -660,7 +681,7 @@ class MouseConfigUiState(
         setStageValue(index, stageValue(index) + delta)
     }
 
-    fun refresh() {
+    fun refresh(mode: ConnectionMode = ConnectionMode.Unknown) {
         if (busy) return
         busy = true
         statusIsError = false
@@ -670,12 +691,9 @@ class MouseConfigUiState(
             busy = false
             if (cfg.success) {
                 for (i in 0 until 6) dpiText[i] = cfg.dpiStages[i].toString()
-                if (cfg.activeDpiIndex in 0..5) activeDpiIndex = cfg.activeDpiIndex
-                val readRate = when {
-                    cfg.wirelessRateIndex in MouseConfigService.RateHz.indices -> cfg.wirelessRateIndex
-                    cfg.usbRateIndex in MouseConfigService.RateHz.indices -> cfg.usbRateIndex
-                    else -> -1
-                }
+                val readDpiIdx = cfg.activeDpiIndexFor(mode)
+                if (readDpiIdx in 0..5) activeDpiIndex = readDpiIdx
+                val readRate = cfg.activeRateIndex(mode)
                 if (readRate >= 0) {
                     rateIndex = readRate
                     settings.rateHz = MouseConfigService.RateHz[readRate]
@@ -760,7 +778,7 @@ private fun rememberMouseConfigUiState(settings: AppSettings): MouseConfigUiStat
 }
 
 @Composable
-private fun MousePage(state: MouseConfigUiState, wide: Boolean) {
+private fun MousePage(state: MouseConfigUiState, mode: ConnectionMode, wide: Boolean) {
     val c = rememberMochiColors()
 
     val syncSection: @Composable () -> Unit = {
@@ -790,7 +808,7 @@ private fun MousePage(state: MouseConfigUiState, wide: Boolean) {
                         )
                     }
                 },
-                onClick = { state.refresh() },
+                onClick = { state.refresh(mode) },
             )
         }
     }
@@ -1457,6 +1475,11 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "4.1.1" to listOf(
+        "修复 12 67 全量配置报告 byte[1]（有线 USB）与 byte[2]（2.4G 无线）错位导致 2000Hz 等无线回报率误读为 1000Hz 的问题",
+        "按当前实际连接方式（2.4G 无线 / USB 有线）精准匹配回报率与 DPI 档位，模式切换时自动同步",
+        "修复开机静默启动时鼠标休眠导致配置读取失败后不会自动补读的问题：鼠标唤醒上线或打开鼠标页时自动同步",
+    ),
     "4.1.0" to listOf(
         "新增充电电压虚高平滑滤波，解决插电瞬间电量从 87% 暴涨到 100% 的假满电问题，并透明显示固件原始值",
         "融合开源社区协议成果：双采样防抖确认、无线在线标志位校验、区分「充电中 / 已充满」、监听 Report 0x13 主动推送",

@@ -1,6 +1,6 @@
 ﻿; MCHOSE A7 V2 Ultra+ Battery 安装脚本（NSIS 3.x，Unicode）
 ; 构建（在仓库根目录）：
-;   makensis /DAPP_VERSION=4.0.0 /DPRODUCT_VERSION=4.0.0 installer/setup.nsi
+;   makensis /DAPP_VERSION=4.1.1 /DPRODUCT_VERSION=4.1.1 installer/setup.nsi
 ; 说明：
 ;   - 默认按用户安装到 %LOCALAPPDATA%\Programs\MCHOSE-A7V2UltraPlus-Battery，无需管理员权限
 ;   - 安装向导里可以勾选「创建桌面快捷方式」和「开机自动启动」
@@ -12,10 +12,10 @@ Unicode true
 !include "FileFunc.nsh"
 
 !ifndef APP_VERSION
-  !define APP_VERSION "4.1.0"
+  !define APP_VERSION "4.1.1"
 !endif
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "4.1.0"
+  !define PRODUCT_VERSION "4.1.1"
 !endif
 
 !define APP_NAME      "MCHOSE A7 V2 Ultra+ Battery"

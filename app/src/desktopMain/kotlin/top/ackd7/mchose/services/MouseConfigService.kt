@@ -11,10 +11,40 @@ data class MouseConfig(
     var error: String = "",
     var dpiStages: IntArray = IntArray(6),
     var activeDpiIndex: Int = -1,
+    var usbDpiIndex: Int = -1,
+    var wirelessDpiIndex: Int = -1,
     var usbRateIndex: Int = -1,
     var wirelessRateIndex: Int = -1,
     var raw: String = "",
-)
+) {
+    /** 按当前连接方式选择对应的生效回报率档位（有线取 usbRate，无线/未知取 wirelessRate）。 */
+    fun activeRateIndex(mode: ConnectionMode): Int = when (mode) {
+        ConnectionMode.Usb -> when {
+            usbRateIndex in MouseConfigService.RateHz.indices -> usbRateIndex
+            wirelessRateIndex in MouseConfigService.RateHz.indices -> wirelessRateIndex
+            else -> -1
+        }
+        else -> when {
+            wirelessRateIndex in MouseConfigService.RateHz.indices -> wirelessRateIndex
+            usbRateIndex in MouseConfigService.RateHz.indices -> usbRateIndex
+            else -> -1
+        }
+    }
+
+    /** 按当前连接方式选择对应的生效 DPI 档位。 */
+    fun activeDpiIndexFor(mode: ConnectionMode): Int = when (mode) {
+        ConnectionMode.Usb -> when {
+            usbDpiIndex in 0..5 -> usbDpiIndex
+            wirelessDpiIndex in 0..5 -> wirelessDpiIndex
+            else -> activeDpiIndex
+        }
+        else -> when {
+            wirelessDpiIndex in 0..5 -> wirelessDpiIndex
+            usbDpiIndex in 0..5 -> usbDpiIndex
+            else -> activeDpiIndex
+        }
+    }
+}
 
 /**
  * 迈从 A7 鼠标配置读写（DPI / 回报率），对应原 C# MouseConfigService。
@@ -97,16 +127,19 @@ class MouseConfigService {
 
     private fun parse(p: ByteArray, r: MouseConfig) {
         if (p.size < 18) return
-        // 实机验证（及 LORQAQ/mchose-tray 实验 A/B/C）：
-        // byte[1]: 低 4 位 = 无线 DPI 档位, 高 4 位 = 无线回报率档位
-        // byte[2]: 低 4 位 = 有线 DPI 档位, 高 4 位 = 有线回报率档位
-        val gDpi = p[1].toInt() and 0x0F
-        val gRate = (p[1].toInt() shr 4) and 0x0F
-        val usbDpi = p[2].toInt() and 0x0F
-        val usbRate = (p[2].toInt() shr 4) and 0x0F
-        r.wirelessRateIndex = clampIndex(gRate)
+        // 实机验证（A7 V2 Ultra+ 实测 raw=00 22 32 对应有线 1000Hz / 无线 2000Hz，
+        // 与 alexfrih/mchose-linux proto.rs 及 0x11 0x41 写入落点完全一致）：
+        // byte[1]: 低 4 位 = 有线 DPI 档位 (usbDpiIndex),     高 4 位 = 有线回报率档位 (usbRateIndex)
+        // byte[2]: 低 4 位 = 2.4G 无线 DPI 档位 (gDpiIndex), 高 4 位 = 2.4G 无线回报率档位 (gRateIndex)
+        val usbDpi = p[1].toInt() and 0x0F
+        val usbRate = (p[1].toInt() shr 4) and 0x0F
+        val gDpi = p[2].toInt() and 0x0F
+        val gRate = (p[2].toInt() shr 4) and 0x0F
         r.usbRateIndex = clampIndex(usbRate)
-        r.activeDpiIndex = if (clampIndex(gDpi) >= 0) gDpi else clampIndex(usbDpi)
+        r.wirelessRateIndex = clampIndex(gRate)
+        r.usbDpiIndex = clampIndex(usbDpi)
+        r.wirelessDpiIndex = clampIndex(gDpi)
+        r.activeDpiIndex = if (r.wirelessDpiIndex >= 0) r.wirelessDpiIndex else r.usbDpiIndex
 
         for (i in 0 until 6) {
             val v = (p[4 + i * 2].toInt() and 0xFF) or ((p[5 + i * 2].toInt() and 0xFF) shl 8)

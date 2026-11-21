@@ -77,7 +77,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.1.0"
+const val APP_VERSION = "4.1.1"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"

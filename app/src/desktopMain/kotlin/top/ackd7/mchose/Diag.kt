@@ -54,9 +54,9 @@ fun main() {
     println("=== 读取鼠标配置（只读）===")
     val cfg = MouseConfigService().read()
     println(
-        "success=${cfg.success} activeDpiIndex=${cfg.activeDpiIndex} " +
-            "wirelessRate=${MouseConfigService.rateLabel(cfg.wirelessRateIndex)} " +
-            "usbRate=${MouseConfigService.rateLabel(cfg.usbRateIndex)} " +
+        "success=${cfg.success} activeDpiIndex=${cfg.activeDpiIndexFor(info.mode)} " +
+            "activeRate=${MouseConfigService.rateLabel(cfg.activeRateIndex(info.mode))} " +
+            "(wireless=${MouseConfigService.rateLabel(cfg.wirelessRateIndex)}, usb=${MouseConfigService.rateLabel(cfg.usbRateIndex)}) " +
             "dpi=${cfg.dpiStages.joinToString()}",
     )
     println("raw=${cfg.raw}")
