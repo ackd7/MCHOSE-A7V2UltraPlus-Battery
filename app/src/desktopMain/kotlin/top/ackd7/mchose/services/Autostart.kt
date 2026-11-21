@@ -26,10 +26,14 @@ object Autostart {
         try {
             if (enabled) {
                 val exe = ProcessHandle.current().info().command().orElse(null)
-                if (!exe.isNullOrBlank()) {
+                val lower = exe?.lowercase().orEmpty()
+                // 防止本地 gradlew run 调试时误把 java.exe / javaw.exe 写入开机自启
+                if (!exe.isNullOrBlank() && !lower.endsWith("\\java.exe") && !lower.endsWith("\\javaw.exe")) {
                     Advapi32Util.registrySetStringValue(
                         WinReg.HKEY_CURRENT_USER, RUN_KEY, APP_NAME, "\"$exe\" --minimized"
                     )
+                } else if (!exe.isNullOrBlank()) {
+                    top.ackd7.mchose.appLog("跳过写入开机自启（当前为开发期 JVM 进程：$exe）")
                 }
             } else {
                 Advapi32Util.registryDeleteValue(WinReg.HKEY_CURRENT_USER, RUN_KEY, APP_NAME)

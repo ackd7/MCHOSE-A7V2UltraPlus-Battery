@@ -1,12 +1,11 @@
 package top.ackd7.mchose.services
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.net.HttpURLConnection
 import top.ackd7.mchose.APP_ID
-import java.net.URL
+import java.net.HttpURLConnection
+import java.net.URI
 
 /**
  * 更新信息（对应原 C# UpdateInfo）。
@@ -28,14 +27,20 @@ class UpdateChecker {
 
     fun check(currentVersion: String): UpdateInfo {
         val result = UpdateInfo()
+        var conn: HttpURLConnection? = null
         return try {
-            val conn = URL(ApiUrl).openConnection() as HttpURLConnection
+            conn = URI(ApiUrl).toURL().openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
             conn.connectTimeout = 8000
             conn.readTimeout = 8000
             conn.setRequestProperty("User-Agent", "$APP_ID-Updater")
             conn.setRequestProperty("Accept", "application/vnd.github+json")
-            val text = conn.inputStream.bufferedReader().use { it.readText() }
+            val code = conn.responseCode
+            if (code !in 200..299) {
+                result.error = "HTTP $code"
+                return result
+            }
+            val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
 
             val root = Json.parseToJsonElement(text).jsonObject
             result.latestVersion = root["tag_name"]?.jsonPrimitive?.content ?: ""
@@ -47,6 +52,8 @@ class UpdateChecker {
         } catch (ex: Exception) {
             result.error = ex.message ?: "检查失败"
             result
+        } finally {
+            conn?.disconnect()
         }
     }
 

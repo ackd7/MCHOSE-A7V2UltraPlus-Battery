@@ -98,10 +98,10 @@ DPI / 回报率（同一协议族的厂商命令）：
 .\gradlew.bat :app:compileKotlinDesktop
 
 # 打包 MSI（产物：app/build/compose/binaries/main/msi/）
-.\gradlew.bat :app:packageMsi -PappVersion=3.2.3
+.\gradlew.bat :app:packageMsi -PappVersion=3.2.4
 
 # 打中文安装向导（需先装 NSIS，产物：dist/）
-makensis /DAPP_VERSION=3.2.3 installer/setup.nsi
+makensis /DAPP_VERSION=3.2.4 installer/setup.nsi
 
 # 硬件自检（枚举设备、读电量、读配置）
 .\gradlew.bat :app:diag
@@ -114,10 +114,12 @@ app/src/desktopMain/kotlin/top/ackd7/mchose/
 ├── Main.kt                     # 入口：窗口、托盘、监控编排、低电量提醒
 ├── interop/HidNative.kt        # HID 枚举、Feature 读写与并发锁（JNA）
 ├── services/
+│   ├── MchoseHidProtocol.kt    # HID 厂商通道枚举与 ACK 公共封装
 │   ├── MchoseBatteryReader.kt  # 电量协议解析
 │   ├── MouseConfigService.kt   # DPI / 回报率读写协议
 │   ├── BatteryMonitor.kt       # 轮询调度（协程）
 │   ├── NativeTrayIcon.kt       # 系统托盘图标与点击事件
+│   ├── SingleInstance.kt       # 单实例文件锁与二次启动唤醒
 │   ├── AppSettings.kt          # 设置持久化（JSON）
 │   ├── Autostart.kt            # 开机自启（注册表）
 │   └── UpdateChecker.kt        # GitHub Releases 更新检查
@@ -231,10 +233,10 @@ Requires **JDK 21** (`gradlew` downloads Gradle 9.x automatically).
 .\gradlew.bat :app:compileKotlinDesktop
 
 # Build MSI package (output: app/build/compose/binaries/main/msi/)
-.\gradlew.bat :app:packageMsi -PappVersion=3.2.3
+.\gradlew.bat :app:packageMsi -PappVersion=3.2.4
 
 # Build NSIS Setup installer (requires NSIS, output: dist/)
-makensis /DAPP_VERSION=3.2.3 installer/setup.nsi
+makensis /DAPP_VERSION=3.2.4 installer/setup.nsi
 
 # Run hardware diagnostics (enumerate HID devices, read battery & config)
 .\gradlew.bat :app:diag

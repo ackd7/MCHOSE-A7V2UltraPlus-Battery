@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -146,11 +148,11 @@ fun MochiRow(
                 .fillMaxWidth()
                 .background(if (pressed && clickable) c.fill else Color.Transparent)
                 .then(
-                    if (clickable) {
+                    if (onClick != null && enabled) {
                         Modifier.clickable(
                             interactionSource = interaction,
                             indication = null,
-                            onClick = onClick!!,
+                            onClick = onClick,
                         )
                     } else {
                         Modifier
@@ -207,6 +209,7 @@ fun MochiButtonRow(
     text: String,
     onClick: () -> Unit,
     danger: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val c = rememberMochiColors()
     val interaction = remember { MutableInteractionSource() }
@@ -215,14 +218,28 @@ fun MochiButtonRow(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 52.dp)
-            .background(if (pressed) c.fill else Color.Transparent)
-            .clickable(interactionSource = interaction, indication = null, onClick = onClick),
+            .background(if (pressed && enabled) c.fill else Color.Transparent)
+            .then(
+                if (enabled) {
+                    Modifier.clickable(
+                        interactionSource = interaction,
+                        indication = null,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
             fontSize = 15.sp,
-            color = if (danger) c.danger else c.accent,
+            color = when {
+                !enabled -> c.secondary
+                danger -> c.danger
+                else -> c.accent
+            },
             textAlign = TextAlign.Center,
         )
     }
@@ -338,9 +355,12 @@ fun MochiDropdownRow(
                             transformOrigin = TransformOrigin(0.5f, 0f)
                         }
                         .width(180.dp)
+                        .heightIn(max = 260.dp)
                         .shadow(18.dp, RoundedCornerShape(16.dp))
                         .clip(RoundedCornerShape(16.dp))
                         .background(c.card)
+                        .border(1.dp, c.cardBorder, RoundedCornerShape(16.dp))
+                        .verticalScroll(rememberScrollState())
                         .padding(vertical = 6.dp),
                 ) {
                     options.forEachIndexed { index, label ->

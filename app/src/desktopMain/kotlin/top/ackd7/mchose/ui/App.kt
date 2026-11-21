@@ -492,8 +492,8 @@ class MouseConfigUiState(
         val values = IntArray(6)
         for (i in 0 until 6) {
             val v = dpiText[i].trim().toIntOrNull()
-            if (v == null || v !in 100..42000) {
-                status = "档位 ${i + 1} 的 DPI 需在 100–42000 之间"
+            if (v == null || v !in 100..42000 || v % 10 != 0) {
+                status = "档位 ${i + 1} 的 DPI 需在 100–42000 之间且为 10 的整数倍"
                 return
             }
             values[i] = v
@@ -551,6 +551,7 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
                 subtitle = "从鼠标回读 DPI 档位（启动时已自动读取）",
                 chevron = true,
                 divider = false,
+                enabled = !state.busy,
                 onClick = { state.refresh() },
             )
         }
@@ -566,7 +567,10 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
                     value = state.dpiText[i],
                     accent = active,
                     divider = true,
-                    onClick = { state.activeDpiIndex = i },
+                    onClick = {
+                        state.activeDpiIndex = i
+                        state.customDpi = false
+                    },
                     trailing = if (active) {
                         { Check(color = c.accent) }
                     } else {
@@ -597,7 +601,7 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
             if (customSelected) {
                 MochiRow(
                     title = "自定义数值",
-                    subtitle = "100–42000",
+                    subtitle = "100–42000（10 的倍数）",
                     divider = false,
                     trailing = {
                         BasicTextField(
@@ -621,6 +625,7 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
 
             MochiButtonRow(
                 text = "写入 DPI（档位 ${state.activeDpiIndex + 1}）",
+                enabled = !state.busy,
                 onClick = { state.writeDpi() },
             )
         }
@@ -637,7 +642,11 @@ private fun MousePage(settings: AppSettings, state: MouseConfigUiState, wide: Bo
                 selectedIndex = state.rateIndex,
                 onSelect = { state.rateIndex = it },
             )
-            MochiButtonRow(text = "写入回报率", onClick = { state.writeRate() })
+            MochiButtonRow(
+                text = "写入回报率",
+                enabled = !state.busy,
+                onClick = { state.writeRate() },
+            )
         }
     }
 
@@ -901,6 +910,12 @@ private fun SettingsPage(
 
 /** 内置的更新摘要（发版时同步维护）。 */
 private val RecentChanges = listOf(
+    "3.2.4" to listOf(
+        "新增单实例限制：重复打开时自动唤醒已在托盘运行的窗口",
+        "下拉选项面板支持滚动，解决 DPI 长列表被裁切的问题",
+        "日志超过 1 MB 自动轮转，修复标准输出中文乱码问题",
+        "同步安装向导写入的开机自启状态，优化自定义 DPI 校验与多屏托盘菜单定位",
+    ),
     "3.2.3" to listOf(
         "修复开机自启（--minimized）仍会弹出主窗口的问题，改为真正静默驻留托盘",
         "修复静默启动后点击窗口关闭按钮无法隐藏窗口的问题",

@@ -29,26 +29,15 @@ data class MouseConfig(
  */
 class MouseConfigService {
 
-    private val featureLen = 65
-    private val pageVendor = 0xFF01
-    private val ridShort = 0x11.toByte()
-    private val ridLong = 0x12.toByte()
-    private val cmdBond = 0x03.toByte()
+    private val featureLen = MchoseHidProtocol.FEATURE_LEN
+    private val ridShort = MchoseHidProtocol.RID_SHORT
+    private val ridLong = MchoseHidProtocol.RID_LONG
+    private val cmdBond = MchoseHidProtocol.CMD_BOND
     private val cmdConfigRead = 0x67.toByte()
     private val cmdDpiWrite = 0x40.toByte()
     private val cmdRateWrite = 0x41.toByte()
 
-    fun discover(): List<HidDeviceInfo> {
-        val found = ArrayList<HidDeviceInfo>()
-        val seen = HashSet<String>()
-        for (h in HidNative.enumerate()) {
-            if (h.vendorId != MchoseBatteryReader.MchoseVid) continue
-            if (h.usagePage != pageVendor) continue
-            if (h.featureReportLength != featureLen) continue
-            if (seen.add(h.path)) found.add(h)
-        }
-        return found
-    }
+    fun discover(): List<HidDeviceInfo> = MchoseHidProtocol.discover()
 
     fun read(): MouseConfig = HidNative.withDeviceLock {
         val r = MouseConfig()
@@ -208,19 +197,8 @@ class MouseConfigService {
         s.setFeature(buildFrame(rid, cmd, args))
     }
 
-    private fun waitAck(s: HidNative.HidSession, cmd: Byte, totalMs: Int): Boolean {
-        val target = "e5" + String.format("%02x", cmd.toInt() and 0xFF)
-        var waited = 0
-        while (waited < totalMs) {
-            val p = s.read(80)
-            waited += 80
-            if (p == null) continue
-            val sb = StringBuilder()
-            for (i in 1 until p.size) sb.append(String.format("%02x", (p[i].toInt() xor 0xFF) and 0xFF))
-            if (sb.toString().startsWith(target)) return true
-        }
-        return false
-    }
+    private fun waitAck(s: HidNative.HidSession, cmd: Byte, totalMs: Int): Boolean =
+        MchoseHidProtocol.waitAck(s, cmd, totalMs)
 
     private fun readFeature(s: HidNative.HidSession, rid: Byte, expectCmd: Byte, retries: Int): ByteArray? {
         for (k in 0 until retries) {
@@ -246,15 +224,7 @@ class MouseConfigService {
         return null
     }
 
-    private fun hex(b: ByteArray?, max: Int): String {
-        if (b == null) return ""
-        val sb = StringBuilder()
-        for (i in 0 until minOf(max, b.size)) {
-            if (i > 0) sb.append(' ')
-            sb.append(String.format("%02X", b[i].toInt() and 0xFF))
-        }
-        return sb.toString()
-    }
+    private fun hex(b: ByteArray?, max: Int): String = MchoseHidProtocol.hex(b, max)
 
     companion object {
         val RateHz = intArrayOf(125, 500, 1000, 2000, 4000, 8000)

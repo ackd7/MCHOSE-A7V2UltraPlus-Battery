@@ -44,9 +44,11 @@ import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.ackd7.mchose.services.AppSettings
+import top.ackd7.mchose.services.Autostart
 import top.ackd7.mchose.services.BatteryInfo
 import top.ackd7.mchose.services.BatteryMonitor
 import top.ackd7.mchose.services.NativeTrayIcon
+import top.ackd7.mchose.services.SingleInstance
 import top.ackd7.mchose.services.UpdateChecker
 import top.ackd7.mchose.services.UpdateInfo
 import top.ackd7.mchose.ui.App
@@ -55,7 +57,7 @@ import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.2.3"
+const val APP_VERSION = "3.2.4"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -68,12 +70,23 @@ private var startupArgs: Array<String> = emptyArray()
 
 internal fun appArgsContains(arg: String): Boolean = startupArgs.contains(arg)
 
-/** 轻量日志：写入 %LOCALAPPDATA%\APP_ID\app.log，便于排查启动异常。 */
+private val logLock = Any()
+private const val MAX_LOG_BYTES = 1024L * 1024L
+
+/** 轻量日志：写入 %LOCALAPPDATA%\APP_ID\app.log（超过 1 MB 自动轮转，防止无限增长）。 */
 internal fun appLog(msg: String) {
-    runCatching {
-        val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
-        val dir = java.io.File(base, APP_ID).apply { mkdirs() }
-        java.io.File(dir, "app.log").appendText("[${java.time.LocalDateTime.now()}] $msg\n")
+    synchronized(logLock) {
+        runCatching {
+            val base = System.getenv("LOCALAPPDATA") ?: System.getProperty("user.home")
+            val dir = java.io.File(base, APP_ID).apply { mkdirs() }
+            val file = java.io.File(dir, "app.log")
+            if (file.exists() && file.length() > MAX_LOG_BYTES) {
+                val backup = java.io.File(dir, "app.log.old")
+                backup.delete()
+                file.renameTo(backup)
+            }
+            file.appendText("[${java.time.LocalDateTime.now()}] $msg\n", Charsets.UTF_8)
+        }
     }
 }
 
@@ -82,22 +95,45 @@ private fun installStdStreamTee() {
     runCatching {
         val tee = java.io.PrintStream(
             object : java.io.OutputStream() {
-                private val line = StringBuilder()
+                private val buf = java.io.ByteArrayOutputStream()
+
+                @Synchronized
+                private fun flushLine() {
+                    if (buf.size() == 0) return
+                    val text = buf.toString(Charsets.UTF_8).trimEnd('\r')
+                    buf.reset()
+                    if (text.isNotBlank()) appLog("OUT: $text")
+                }
+
+                @Synchronized
                 override fun write(b: Int) {
                     if (b == '\n'.code) {
-                        if (line.isNotBlank()) appLog("OUT: $line")
-                        line.setLength(0)
+                        flushLine()
                     } else {
-                        line.append(b.toChar())
-                        if (line.length > 4000) {
-                            appLog("OUT: $line")
-                            line.setLength(0)
+                        buf.write(b)
+                        if (buf.size() >= 4096) flushLine()
+                    }
+                }
+
+                @Synchronized
+                override fun write(b: ByteArray, off: Int, len: Int) {
+                    var start = off
+                    val end = off + len
+                    for (i in off until end) {
+                        if (b[i].toInt() == '\n'.code) {
+                            if (i > start) buf.write(b, start, i - start)
+                            flushLine()
+                            start = i + 1
                         }
+                    }
+                    if (start < end) {
+                        buf.write(b, start, end - start)
+                        if (buf.size() >= 4096) flushLine()
                     }
                 }
             },
             true,
-            "UTF-8",
+            Charsets.UTF_8,
         )
         System.setErr(tee)
         System.setOut(tee)
@@ -106,15 +142,37 @@ private fun installStdStreamTee() {
 
 fun main(args: Array<String>) {
     startupArgs = args
+    val startMinimized = args.contains("--minimized")
     installStdStreamTee()
     Thread.setDefaultUncaughtExceptionHandler { t, e ->
         appLog("UNCAUGHT in ${t.name}: ${e.stackTraceToString()}")
     }
+
+    // 单实例锁：若已有实例在托盘运行，非静默启动时自动唤醒旧窗口并退出
+    val singleInstance = SingleInstance.tryAcquire(notifyIfRunning = !startMinimized)
+    if (singleInstance == null) {
+        appLog("检测到已有运行中实例，已发送唤醒信号并退出")
+        return
+    }
+
     appLog("=== 启动 v$APP_VERSION args=${args.joinToString(" ")} ===")
 
     val settings = AppSettings.load()
+    // 与真实注册表自启状态双向同步：
+    // 1) 若设置里开启了自启，刷新注册表为新 exe 路径并清理旧 A7Battery 值
+    // 2) 若安装向导勾选了开机自启写入了注册表，但 settings.json 仍为 false，则同步为 true
+    runCatching {
+        if (settings.autoStart) {
+            Autostart.setEnabled(true)
+            appLog("开机自启已刷新为新路径")
+        } else if (Autostart.isEnabled()) {
+            settings.autoStart = true
+            settings.save()
+            appLog("检测到安装向导已配置开机自启，已同步至设置")
+        }
+    }
+
     val monitor = BatteryMonitor()
-    val startMinimized = args.contains("--minimized")
     val initialPage = args.firstOrNull { it.startsWith("--page=") }
         ?.substringAfter("=")?.toIntOrNull() ?: 0
 
@@ -177,11 +235,15 @@ fun main(args: Array<String>) {
             menuVisible = false
             tray?.close()
             monitor.stop()
+            singleInstance.close()
             javax.swing.SwingUtilities.invokeLater { exitApplication() }
         }
 
         // 所有副作用只做一次
         LaunchedEffect(Unit) {
+            singleInstance.setWakeHandler {
+                javax.swing.SwingUtilities.invokeLater { openMainWindow() }
+            }
             try {
                 val t = NativeTrayIcon()
                 t.accent = java.awt.Color(0x34, 0x82, 0xFF)
@@ -236,15 +298,6 @@ fun main(args: Array<String>) {
             }
             monitor.start(settings.refreshSeconds)
             appLog("监控已启动")
-
-            // 开机自启迁移：旧版本写的是 A7Battery 注册表值 + 旧 exe 路径，
-            // 升级后旧 exe 已不存在。按设置里的开关重写一次，顺带清掉旧值。
-            if (settings.autoStart) {
-                withContext(Dispatchers.IO) {
-                    top.ackd7.mchose.services.Autostart.setEnabled(true)
-                }
-                appLog("开机自启已刷新为新路径")
-            }
 
             // 每次启动都检查一次更新（网络开销很小，用户也期望"打开就检查"）
             if (settings.checkUpdates) {
@@ -369,13 +422,19 @@ fun main(args: Array<String>) {
                     }
                 })
             }
-            // 每次弹出时移动到鼠标位置（托盘在屏幕底部，所以往上弹）
+            // 每次弹出时移动到鼠标所在屏幕的指针上方（兼容多显示器与副屏任务栏）
             LaunchedEffect(menuVisible) {
                 if (menuVisible) {
-                    val p = java.awt.MouseInfo.getPointerInfo()?.location ?: java.awt.Point(100, 100)
-                    val screen = java.awt.Toolkit.getDefaultToolkit().screenSize
-                    val x = p.x.coerceIn(0, (screen.width - win.width).coerceAtLeast(0))
-                    val y = (p.y - win.height - 8).coerceAtLeast(0)
+                    val pointer = java.awt.MouseInfo.getPointerInfo()
+                    val p = pointer?.location ?: java.awt.Point(100, 100)
+                    val bounds = pointer?.device?.defaultConfiguration?.bounds
+                        ?: java.awt.Rectangle(java.awt.Toolkit.getDefaultToolkit().screenSize)
+                    val minX = bounds.x
+                    val maxX = (bounds.x + bounds.width - win.width).coerceAtLeast(minX)
+                    val minY = bounds.y
+                    val maxY = (bounds.y + bounds.height - win.height).coerceAtLeast(minY)
+                    val x = p.x.coerceIn(minX, maxX)
+                    val y = (p.y - win.height - 8).coerceIn(minY, maxY)
                     win.setLocation(x, y)
                     win.toFront()
                     win.requestFocus()

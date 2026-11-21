@@ -16,7 +16,8 @@ data class HidDeviceInfo(
     val manufacturer: String = "",
 ) {
     override fun toString(): String =
-        "$vendorId".padStart(4, '0') + ":" + "$productId".padStart(4, '0') +
+        vendorId.toString(16).uppercase().padStart(4, '0') + ":" +
+            productId.toString(16).uppercase().padStart(4, '0') +
             " UP=${usagePage.toUShort().toString(16).uppercase()}" +
             " FL=$featureReportLength $productName"
 }

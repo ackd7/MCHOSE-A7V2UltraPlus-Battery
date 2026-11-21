@@ -195,7 +195,12 @@ object HidNative {
             if (handle == WinBase.INVALID_HANDLE_VALUE) {
                 throw IllegalStateException("无法打开 HID 设备，错误码 " + Native.getLastError())
             }
-            evt = Kernel32.INSTANCE.CreateEvent(null, true, false, null)
+            val createdEvt = Kernel32.INSTANCE.CreateEvent(null, true, false, null)
+            if (createdEvt == null || createdEvt == WinBase.INVALID_HANDLE_VALUE) {
+                Kernel32.INSTANCE.CloseHandle(handle)
+                throw IllegalStateException("创建重叠 I/O 事件失败，错误码 " + Native.getLastError())
+            }
+            evt = createdEvt
         }
 
         fun setFeature(report: ByteArray): Boolean = hid.HidD_SetFeature(handle, report, report.size)
@@ -233,8 +238,8 @@ object HidNative {
         override fun close() {
             if (closed) return
             closed = true
-            if (evt != null && evt != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(evt)
-            if (handle != null && handle != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(handle)
+            if (evt != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(evt)
+            if (handle != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(handle)
         }
     }
 }

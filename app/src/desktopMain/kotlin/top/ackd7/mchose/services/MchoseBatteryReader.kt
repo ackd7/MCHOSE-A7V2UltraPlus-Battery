@@ -23,23 +23,12 @@ import top.ackd7.mchose.interop.HidNative
  */
 class MchoseBatteryReader {
 
-    private val featureLen = 65
-    private val pageVendor = 0xFF01
-    private val ridQuery = 0x11.toByte()
-    private val cmdBond = 0x03.toByte()
+    private val featureLen = MchoseHidProtocol.FEATURE_LEN
+    private val ridQuery = MchoseHidProtocol.RID_SHORT
+    private val cmdBond = MchoseHidProtocol.CMD_BOND
     private val cmdOst = 0x06.toByte()
 
-    fun discover(): List<HidDeviceInfo> {
-        val found = ArrayList<HidDeviceInfo>()
-        val seen = HashSet<String>()
-        for (h in HidNative.enumerate()) {
-            if (h.vendorId != MchoseVid) continue
-            if (h.usagePage != pageVendor) continue
-            if (h.featureReportLength != featureLen) continue
-            if (seen.add(h.path)) found.add(h)
-        }
-        return found
-    }
+    fun discover(): List<HidDeviceInfo> = MchoseHidProtocol.discover()
 
     fun read(accumulate: BatteryInfo? = null): BatteryInfo = HidNative.withDeviceLock {
         val preferredPath = accumulate?.lastPath.orEmpty()
@@ -140,19 +129,8 @@ class MchoseBatteryReader {
         s.setFeature(buf)
     }
 
-    private fun waitAck(s: HidNative.HidSession, cmd: Byte, totalMs: Int): Boolean {
-        val target = "e5" + String.format("%02x", cmd.toInt() and 0xFF)
-        var waited = 0
-        while (waited < totalMs) {
-            val p = s.read(80)
-            waited += 80
-            if (p == null) continue
-            val sb = StringBuilder()
-            for (i in 1 until p.size) sb.append(String.format("%02x", (p[i].toInt() xor 0xFF) and 0xFF))
-            if (sb.toString().startsWith(target)) return true
-        }
-        return false
-    }
+    private fun waitAck(s: HidNative.HidSession, cmd: Byte, totalMs: Int): Boolean =
+        MchoseHidProtocol.waitAck(s, cmd, totalMs)
 
     private fun getPayload(s: HidNative.HidSession): ByteArray? {
         val gb = ByteArray(featureLen)
@@ -170,17 +148,9 @@ class MchoseBatteryReader {
         return p
     }
 
-    private fun hex(b: ByteArray?, max: Int): String {
-        if (b == null) return ""
-        val sb = StringBuilder()
-        for (i in 0 until minOf(max, b.size)) {
-            if (i > 0) sb.append(' ')
-            sb.append(String.format("%02X", b[i].toInt() and 0xFF))
-        }
-        return sb.toString()
-    }
+    private fun hex(b: ByteArray?, max: Int): String = MchoseHidProtocol.hex(b, max)
 
     companion object {
-        const val MchoseVid: Int = 0x3837
+        const val MchoseVid: Int = MchoseHidProtocol.MCHOSE_VID
     }
 }

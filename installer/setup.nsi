@@ -35,7 +35,7 @@ SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
 
-VIProductVersion "1.0.0.0"
+VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "FileDescription" "${APP_NAME} 安装程序"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"
@@ -64,8 +64,9 @@ VIAddVersionKey "CompanyName" "${APP_PUBLISHER}"
 Section "主程序（必需）" SecMain
   SectionIn RO
 
-  ; 安装前先结束正在运行的实例，避免文件占用
+  ; 安装前先结束正在运行的实例（含旧版本进程名），避免文件占用
   nsExec::Exec 'taskkill /F /IM ${APP_EXE}'
+  nsExec::Exec 'taskkill /F /IM A7Battery.exe'
   Sleep 300
 
   SetOutPath "$INSTDIR"
