@@ -1475,6 +1475,10 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "4.1.5" to listOf(
+        "紧急修复随机卡死、闪退及无法打开（ntdll 0xC0000374 / MSCTF 0xC0000005 堆破坏）：重构 HID 异步 OVERLAPPED ReadFile 为持久化原生堆内存，彻底消除 JNA 临时缓冲区提前释放被内核写穿的问题",
+        "优化 HID 设备枚举 PreparsedData 释放路径并缓存 DWM 圆角接口实例",
+    ),
     "4.1.4" to listOf(
         "精简窗口交互：移除窗口缩小、放大与关闭过渡动画，恢复原生无边框 Win11 圆角窗口，打开与关闭即点即响应",
         "标题栏右上角仅保留关闭按钮（隐藏至系统托盘），移除缩小与放大按钮",

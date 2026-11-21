@@ -52,10 +52,24 @@ object HidNative {
         fun HidD_SetOutputReport(HidDeviceObject: WinNT.HANDLE, ReportBuffer: ByteArray, ReportBufferLength: Int): Boolean
     }
 
-    // kernel32 补充方法（jna-platform 未内置）
+    // kernel32 补充方法（使用原生 Pointer 签名，避免 JNA 对异步 OVERLAPPED 与缓冲区做临时拷贝/提前释放导致堆破坏）
     private interface Kernel32Extra : Library {
-        fun GetOverlappedResult(hFile: WinNT.HANDLE, lpOverlapped: WinBase.OVERLAPPED, lpNumberOfBytesTransferred: IntByReference, bWait: Boolean): Boolean
-        fun CancelIoEx(hFile: WinNT.HANDLE, lpOverlapped: WinBase.OVERLAPPED?): Boolean
+        fun ReadFile(
+            hFile: WinNT.HANDLE,
+            lpBuffer: Pointer,
+            nNumberOfBytesToRead: Int,
+            lpNumberOfBytesRead: Pointer?,
+            lpOverlapped: Pointer,
+        ): Boolean
+
+        fun GetOverlappedResult(
+            hFile: WinNT.HANDLE,
+            lpOverlapped: Pointer,
+            lpNumberOfBytesTransferred: IntByReference,
+            bWait: Boolean,
+        ): Boolean
+
+        fun CancelIoEx(hFile: WinNT.HANDLE, lpOverlapped: Pointer?): Boolean
     }
 
     // ---------- 结构体 ----------
@@ -143,14 +157,20 @@ object HidNative {
 
                     val pp = PointerByReference()
                     val caps = HIDP_CAPS()
-                    var ok = hid.HidD_GetPreparsedData(h, pp)
-                    if (ok) ok = hid.HidP_GetCaps(pp.value, caps) == HIDP_STATUS_SUCCESS
-                    caps.read()
-                    pp.value?.let { hid.HidD_FreePreparsedData(it) }
+                    val gotPreparsed = hid.HidD_GetPreparsedData(h, pp)
+                    var ok = false
+                    if (gotPreparsed) {
+                        try {
+                            ok = hid.HidP_GetCaps(pp.value, caps) == HIDP_STATUS_SUCCESS
+                            if (ok) caps.read()
+                        } finally {
+                            pp.value?.let { hid.HidD_FreePreparsedData(it) }
+                        }
+                    }
                     if (!ok) continue
 
-                    val productName = readString(h) { b -> hid.HidD_GetProductString(h, b, b.size) }
-                    val manufacturer = readString(h) { b -> hid.HidD_GetManufacturerString(h, b, b.size) }
+                    val productName = readString { b -> hid.HidD_GetProductString(h, b, (b.size - 1) * 2) }
+                    val manufacturer = readString { b -> hid.HidD_GetManufacturerString(h, b, (b.size - 1) * 2) }
 
                     result.add(
                         HidDeviceInfo(
@@ -176,7 +196,7 @@ object HidNative {
         return result
     }
 
-    private fun readString(h: WinNT.HANDLE, getter: (CharArray) -> Boolean): String {
+    private fun readString(getter: (CharArray) -> Boolean): String {
         val buf = CharArray(256)
         return if (getter(buf)) String(buf).trimEnd('\u0000') else ""
     }
@@ -187,6 +207,12 @@ object HidNative {
         private val handle: WinNT.HANDLE
         private val evt: WinNT.HANDLE
         private val inputLen: Int = maxOf(inputLen, 1)
+        // 持久化原生堆内存：供异步 OVERLAPPED ReadFile 在整个 I/O 生命周期内固定持有，
+        // 彻底杜绝 JNA 传递 ByteArray/Structure 临时拷贝提前释放造成的堆破坏（0xC0000374 / 0xC0000005）
+        private val readBuf = com.sun.jna.Memory(this.inputLen.toLong())
+        private val ovSize = if (Native.POINTER_SIZE == 8) 32L else 20L
+        private val ovEventOffset = if (Native.POINTER_SIZE == 8) 24L else 16L
+        private val ovMem = com.sun.jna.Memory(ovSize)
         @Volatile
         private var closed = false
         @Volatile
@@ -197,12 +223,18 @@ object HidNative {
             val access = if (readOnly) WinNT.GENERIC_READ else (WinNT.GENERIC_READ or WinNT.GENERIC_WRITE)
             handle = Kernel32.INSTANCE.CreateFile(path, access, FILE_SHARE_RW, null, WinNT.OPEN_EXISTING, WinNT.FILE_FLAG_OVERLAPPED, null)
             if (handle == WinBase.INVALID_HANDLE_VALUE) {
-                throw IllegalStateException("无法打开 HID 设备，错误码 " + Native.getLastError())
+                val err = Native.getLastError()
+                readBuf.close()
+                ovMem.close()
+                throw IllegalStateException("无法打开 HID 设备，错误码 $err")
             }
             val createdEvt = Kernel32.INSTANCE.CreateEvent(null, true, false, null)
             if (createdEvt == null || createdEvt == WinBase.INVALID_HANDLE_VALUE) {
+                val err = Native.getLastError()
                 Kernel32.INSTANCE.CloseHandle(handle)
-                throw IllegalStateException("创建重叠 I/O 事件失败，错误码 " + Native.getLastError())
+                readBuf.close()
+                ovMem.close()
+                throw IllegalStateException("创建重叠 I/O 事件失败，错误码 $err")
             }
             evt = createdEvt
         }
@@ -213,30 +245,37 @@ object HidNative {
 
         fun read(timeoutMs: Int): ByteArray? {
             if (closed || disconnected) return null
-            Kernel32.INSTANCE.ResetEvent(evt)
-            val ov = WinBase.OVERLAPPED()
-            ov.hEvent = evt
-            val buf = ByteArray(inputLen)
-            val read = IntByReference()
-            val ok = Kernel32.INSTANCE.ReadFile(handle, buf, inputLen, read, ov)
-            if (!ok) {
-                val err = Native.getLastError()
-                if (err != ERROR_IO_PENDING) {
+            try {
+                Kernel32.INSTANCE.ResetEvent(evt)
+                ovMem.clear()
+                ovMem.setPointer(ovEventOffset, evt.pointer)
+
+                val transferred = IntByReference(0)
+                val ok = kernel32Extra.ReadFile(handle, readBuf, inputLen, null, ovMem)
+                if (!ok) {
+                    val err = Native.getLastError()
+                    if (err != ERROR_IO_PENDING) {
+                        disconnected = true
+                        return null
+                    }
+                    if (Kernel32.INSTANCE.WaitForSingleObject(evt, timeoutMs) != 0) {
+                        // 超时：先取消异步请求并同步等待 GetOverlappedResult 确认内核不再写入 readBuf/ovMem
+                        kernel32Extra.CancelIoEx(handle, ovMem)
+                        kernel32Extra.GetOverlappedResult(handle, ovMem, transferred, true)
+                        return null
+                    }
+                }
+                if (!kernel32Extra.GetOverlappedResult(handle, ovMem, transferred, true)) {
                     disconnected = true
                     return null
                 }
-                if (Kernel32.INSTANCE.WaitForSingleObject(evt, timeoutMs) != 0) {
-                    kernel32Extra.CancelIoEx(handle, ov)
-                    kernel32Extra.GetOverlappedResult(handle, ov, IntByReference(), true)
-                    return null
-                }
-                if (!kernel32Extra.GetOverlappedResult(handle, ov, read, false)) {
-                    disconnected = true
-                    return null
-                }
+                val n = transferred.value
+                if (n <= 0) return null
+                return readBuf.getByteArray(0, minOf(n, inputLen))
+            } finally {
+                java.lang.ref.Reference.reachabilityFence(readBuf)
+                java.lang.ref.Reference.reachabilityFence(ovMem)
             }
-            if (read.value <= 0) return null
-            return buf.copyOf(read.value)
         }
 
         fun flush(idleMs: Int) {
@@ -248,8 +287,10 @@ object HidNative {
         override fun close() {
             if (closed) return
             closed = true
-            if (evt != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(evt)
             if (handle != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(handle)
+            if (evt != WinBase.INVALID_HANDLE_VALUE) Kernel32.INSTANCE.CloseHandle(evt)
+            runCatching { ovMem.close() }
+            runCatching { readBuf.close() }
         }
     }
 }

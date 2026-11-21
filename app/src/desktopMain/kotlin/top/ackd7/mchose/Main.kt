@@ -65,7 +65,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.1.4"
+const val APP_VERSION = "4.1.5"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -764,10 +764,13 @@ private fun restoreAndFocusWindow(win: java.awt.Frame, wasIconified: Boolean) {
     }.onFailure { appLog("拉起窗口异常: ${it.message}") }
 }
 
+private val dwmApi: DwmApi by lazy {
+    com.sun.jna.Native.load("dwmapi", DwmApi::class.java)
+}
+
 /** 给无边框窗口加 Windows 11 圆角（失败不影响功能）。 */
 private fun applyRoundedCorners(window: java.awt.Window) {
     val hwnd = com.sun.jna.Native.getWindowPointer(window) ?: return
-    val dwm = com.sun.jna.Native.load("dwmapi", DwmApi::class.java)
     val pref = com.sun.jna.ptr.IntByReference(2) // DWMWCP_ROUND
-    dwm.DwmSetWindowAttribute(hwnd, 33, pref, 4) // DWMWA_WINDOW_CORNER_PREFERENCE
+    dwmApi.DwmSetWindowAttribute(hwnd, 33, pref, 4) // DWMWA_WINDOW_CORNER_PREFERENCE
 }

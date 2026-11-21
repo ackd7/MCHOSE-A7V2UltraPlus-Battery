@@ -3,6 +3,14 @@
 本文件用于生成 GitHub Release 的「更新内容」段落。发布新版本时，在顶部新增一节，
 标题格式为 `## vX.Y.Z`，CI 会按版本号自动截取对应小节。
 
+## v4.1.5
+
+### 紧急稳定性修复
+- **彻底修复软件卡死、闪退及启动即崩（`ntdll.dll 0xC0000374` 堆破坏 / `MSCTF.dll 0xC0000005`）**：
+  - 根因：异步重叠 `ReadFile` 此前直接向 JNA 传入 Java `ByteArray`、`WinBase.OVERLAPPED` 结构体与 `IntByReference`。当 `ReadFile` 返回 `ERROR_IO_PENDING` 后，JNA 立即释放了临时原生缓冲区，随后鼠标上报 `Report 0x13` 或 ACK 时 Windows 内核直接写入已释放堆内存，造成进程堆损坏与随机崩溃（在 `v4.1.x` 开启后台常驻 `Report 0x13` 监听后频繁触发）。
+  - 修复：`HidNative.HidSession` 改用持久化固定原生堆内存（`Memory` + 原始 `Pointer` 签名，`lpNumberOfBytesRead = null`），并严格在 `CancelIoEx` + `GetOverlappedResult(bWait=true)` 完成后才允许复写或释放，彻底杜绝异步 HID 内存越界。
+- 顺带加固 `HidD_GetPreparsedData` 释放路径并缓存 `dwmapi` 接口实例。
+
 ## v4.1.4
 
 ### 精简窗口与标题栏
