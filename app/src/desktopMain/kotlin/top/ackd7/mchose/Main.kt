@@ -48,6 +48,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -78,7 +79,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.1.2"
+const val APP_VERSION = "4.1.3"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -341,10 +342,12 @@ fun main(args: Array<String>) {
             title = APP_NAME,
             state = windowState,
             undecorated = true,
+            transparent = true,
             visible = isVisible,
         ) {
             val win = window
             val uiScope = rememberCoroutineScope()
+            val density = LocalDensity.current.density
             var isMax by remember { mutableStateOf(false) }
             var normalBounds by remember { mutableStateOf<java.awt.Rectangle?>(null) }
 
@@ -355,16 +358,9 @@ fun main(args: Array<String>) {
             }
             val winCanvasBg = if (isDarkWin) Color(0xFF0F1218) else Color(0xFFF2F5FA)
 
-            // 同步底层 AWT 窗口背景色，避免深浅色过渡与动画边缘闪白
-            LaunchedEffect(isDarkWin) {
-                val awtBg = if (isDarkWin) java.awt.Color(0x0F, 0x12, 0x18) else java.awt.Color(0xF2, 0xF5, 0xFA)
-                runCatching {
-                    win.background = awtBg
-                    win.contentPane.background = awtBg
-                }
-            }
-
-            // 统一单帧同步驱动的纯 GPU 窗口动效（零重复 setBounds，4K 高刷满帧丝滑）
+            // 100% 纯 GPU 透明画布窗口动效：
+            // - 关闭/缩小：零 setBounds / 零 setLocation / 零 setOpacity，整块圆角窗口直接被任务栏/托盘吸收，4K 高刷满帧不卡
+            // - 放大/还原：仅 1 次透明画布尺寸切换 + 像素精确锚定的整体拉伸/缩放，背景与全部卡片同步平滑扩大或收回
             var winScaleX by remember { mutableFloatStateOf(1f) }
             var winScaleY by remember { mutableFloatStateOf(1f) }
             var winAlpha by remember { mutableFloatStateOf(1f) }
@@ -373,9 +369,9 @@ fun main(args: Array<String>) {
             var winOrigin by remember { mutableStateOf(TransformOrigin.Center) }
             val animProgress = remember { Animatable(1f) }
             var transitionJob by remember { mutableStateOf<Job?>(null) }
-            var preExitLocation by remember { mutableStateOf<java.awt.Point?>(null) }
             var lastHiddenToTray by remember { mutableStateOf(false) }
             var exiting by remember { mutableStateOf(false) }
+            var morphing by remember { mutableStateOf(false) }
 
             fun resetVisualState() {
                 winScaleX = 1f
@@ -386,107 +382,56 @@ fun main(args: Array<String>) {
                 winOrigin = TransformOrigin.Center
             }
 
-            fun restoreLocationAndOpacity() {
-                preExitLocation?.let { loc ->
-                    win.setLocation(loc)
-                    preExitLocation = null
-                }
-                runCatching { if (win.opacity < 1f) win.opacity = 1f }
-            }
-
             fun playEnterAnimation(fromTray: Boolean = false) {
                 transitionJob?.cancel()
                 exiting = false
-                restoreLocationAndOpacity()
+                morphing = false
                 transitionJob = uiScope.launch {
                     val ease = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
-                    val startScaleX = if (fromTray) 0.84f else 0.88f
-                    val startScaleY = 0.84f
-                    val startOffX = if (fromTray) 42f else 0f
-                    val startOffY = 58f
-                    winOrigin = if (fromTray) TransformOrigin(0.88f, 1f) else TransformOrigin(0.5f, 1f)
+                    val startScaleX = if (fromTray) 0.70f else 0.76f
+                    val startScaleY = 0.68f
+                    val startOffX = if (fromTray) 36f * density else 0f
+                    val startOffY = 48f * density
+                    winOrigin = if (fromTray) TransformOrigin(0.92f, 1f) else TransformOrigin(0.5f, 1f)
                     animProgress.snapTo(0f)
                     winScaleX = startScaleX
                     winScaleY = startScaleY
                     winOffsetX = startOffX
                     winOffsetY = startOffY
                     winAlpha = 0f
-                    animProgress.animateTo(1f, tween(225, easing = ease)) {
+                    animProgress.animateTo(1f, tween(230, easing = ease)) {
                         val t = value
                         winScaleX = startScaleX + (1f - startScaleX) * t
                         winScaleY = startScaleY + (1f - startScaleY) * t
                         winOffsetX = startOffX * (1f - t)
                         winOffsetY = startOffY * (1f - t)
-                        winAlpha = (t * 1.35f).coerceIn(0f, 1f)
-                    }
-                    resetVisualState()
-                }
-            }
-
-            fun playMaximizeMorphAnimation(expanding: Boolean) {
-                transitionJob?.cancel()
-                exiting = false
-                runCatching { if (win.opacity < 1f) win.opacity = 1f }
-                transitionJob = uiScope.launch {
-                    val ease = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
-                    val startScale = if (expanding) 0.945f else 1.045f
-                    val startOffY = if (expanding) 10f else -8f
-                    val startAlpha = if (expanding) 0.78f else 0.82f
-                    val durationMs = if (expanding) 210 else 195
-                    winOrigin = TransformOrigin.Center
-                    animProgress.snapTo(0f)
-                    winScaleX = startScale
-                    winScaleY = startScale
-                    winOffsetX = 0f
-                    winOffsetY = startOffY
-                    winAlpha = startAlpha
-                    animProgress.animateTo(1f, tween(durationMs, easing = ease)) {
-                        val t = value
-                        val s = startScale + (1f - startScale) * t
-                        winScaleX = s
-                        winScaleY = s
-                        winOffsetX = 0f
-                        winOffsetY = startOffY * (1f - t)
-                        winAlpha = startAlpha + (1f - startAlpha) * t
+                        winAlpha = (t * 1.4f).coerceIn(0f, 1f)
                     }
                     resetVisualState()
                 }
             }
 
             fun playCloseAnimation() {
-                if (exiting) return
+                if (exiting || morphing) return
                 transitionJob?.cancel()
                 exiting = true
                 lastHiddenToTray = true
-                val startLoc = java.awt.Point(win.location)
-                preExitLocation = startLoc
-                val work = currentScreenWorkArea(win)
-                val dxToTray = (work.x + work.width - (startLoc.x + win.width)).coerceIn(0, 220)
-                val dyToTray = (work.y + work.height - (startLoc.y + win.height)).coerceIn(0, 160)
-                val slideX = (dxToTray * 0.55f + 75f).toInt().coerceIn(65, 185)
-                val slideY = (dyToTray * 0.55f + 95f).toInt().coerceIn(85, 190)
-
                 transitionJob = uiScope.launch {
                     try {
-                        // 关闭 → 被右下角任务栏托盘吸收（仅平移不改尺寸，零 SwapChain 卡顿）
+                        // 关闭 → 纯 GPU 锚定右下角托盘斜向吸入（零 Win32 阻塞调用，120Hz 满帧）
                         val ease = CubicBezierEasing(0.36f, 0f, 0.72f, 1f)
-                        winOrigin = TransformOrigin(0.92f, 1f)
+                        winOrigin = TransformOrigin(0.95f, 1f)
                         animProgress.snapTo(0f)
                         animProgress.animateTo(1f, tween(215, easing = ease)) {
                             val t = value
-                            winScaleX = 1f - 0.62f * t
-                            winScaleY = 1f - 0.66f * t
-                            winOffsetX = 110f * t
-                            winOffsetY = 140f * t
-                            val fade = (1f - t * t).coerceIn(0f, 1f)
-                            winAlpha = fade
-                            win.setLocation(startLoc.x + (slideX * t).toInt(), startLoc.y + (slideY * t).toInt())
-                            runCatching { win.opacity = fade }
+                            winScaleX = 1f - 0.86f * t
+                            winScaleY = 1f - 0.90f * t
+                            winOffsetX = 28f * density * t
+                            winOffsetY = 46f * density * t
+                            winAlpha = (1f - t * t).coerceIn(0f, 1f)
                         }
-                        // 先同步隐藏底层窗口再复原位置与不透明度，杜绝关闭末帧闪现
                         win.isVisible = false
                         hideMainWindow()
-                        restoreLocationAndOpacity()
                         resetVisualState()
                     } finally {
                         exiting = false
@@ -495,32 +440,23 @@ fun main(args: Array<String>) {
             }
 
             fun playMinimizeAnimation() {
-                if (exiting) return
+                if (exiting || morphing) return
                 transitionJob?.cancel()
                 exiting = true
                 lastHiddenToTray = false
-                val startLoc = java.awt.Point(win.location)
-                preExitLocation = startLoc
-                val work = currentScreenWorkArea(win)
-                val distToBottom = (work.y + work.height - (startLoc.y + win.height)).coerceIn(0, 140)
-                val slideY = (distToBottom + 90).coerceIn(90, 180)
-
                 transitionJob = uiScope.launch {
                     try {
-                        // 缩小 → 被底部任务栏吸收（锚定底边中点向任务栏漏斗式吸入）
+                        // 缩小 → 纯 GPU 锚定底部任务栏中点漏斗式吸入（零 Win32 阻塞调用，120Hz 满帧）
                         val ease = CubicBezierEasing(0.36f, 0f, 0.72f, 1f)
                         winOrigin = TransformOrigin(0.5f, 1f)
                         animProgress.snapTo(0f)
-                        animProgress.animateTo(1f, tween(205, easing = ease)) {
+                        animProgress.animateTo(1f, tween(215, easing = ease)) {
                             val t = value
-                            winScaleX = 1f - 0.50f * t
-                            winScaleY = 1f - 0.64f * t
+                            winScaleX = 1f - 0.82f * t
+                            winScaleY = 1f - 0.90f * t
                             winOffsetX = 0f
-                            winOffsetY = 135f * t
-                            val fade = (1f - t * t).coerceIn(0f, 1f)
-                            winAlpha = fade
-                            win.setLocation(startLoc.x, startLoc.y + (slideY * t).toInt())
-                            runCatching { win.opacity = fade }
+                            winOffsetY = 46f * density * t
+                            winAlpha = (1f - t * t).coerceIn(0f, 1f)
                         }
                         windowState.isMinimized = true
                     } finally {
@@ -530,28 +466,80 @@ fun main(args: Array<String>) {
             }
 
             fun toggleMaximizeAnimated() {
-                if (exiting) return
+                if (exiting || morphing) return
                 if (!isMax) {
-                    val current = win.bounds
-                    normalBounds = java.awt.Rectangle(current)
+                    val current = java.awt.Rectangle(win.bounds)
+                    normalBounds = current
                     val target = currentScreenWorkArea(win)
+                    val sx = (current.width.toFloat() / target.width.coerceAtLeast(1)).coerceIn(0.15f, 1f)
+                    val sy = (current.height.toFloat() / target.height.coerceAtLeast(1)).coerceIn(0.15f, 1f)
+                    val tx = (current.x - target.x) * density
+                    val ty = (current.y - target.y) * density
                     isMax = true
+                    morphing = true
                     appLog("切换最大化：普通 -> 放大工作区 $target")
-                    // 仅调用一次 setBounds（单次画布重建），再用纯 GPU 动效顺滑展开
+                    // 先将透明画布内的整块窗口锚定到原位置尺寸，再单次扩大画布，实现背景与所有卡片同步平滑拉伸
+                    winOrigin = TransformOrigin(0f, 0f)
+                    winScaleX = sx
+                    winScaleY = sy
+                    winOffsetX = tx
+                    winOffsetY = ty
+                    winAlpha = 1f
                     win.setBounds(target)
-                    playMaximizeMorphAnimation(expanding = true)
+                    transitionJob?.cancel()
+                    transitionJob = uiScope.launch {
+                        try {
+                            val ease = CubicBezierEasing(0.18f, 0.96f, 0.24f, 1f)
+                            animProgress.snapTo(0f)
+                            animProgress.animateTo(1f, tween(250, easing = ease)) {
+                                val t = value
+                                winScaleX = sx + (1f - sx) * t
+                                winScaleY = sy + (1f - sy) * t
+                                winOffsetX = tx * (1f - t)
+                                winOffsetY = ty * (1f - t)
+                            }
+                            resetVisualState()
+                        } finally {
+                            morphing = false
+                        }
+                    }
                 } else {
+                    val current = java.awt.Rectangle(win.bounds)
                     val target = normalBounds ?: defaultCenteredBounds(win)
-                    isMax = false
+                    val sx = (target.width.toFloat() / current.width.coerceAtLeast(1)).coerceIn(0.15f, 1f)
+                    val sy = (target.height.toFloat() / current.height.coerceAtLeast(1)).coerceIn(0.15f, 1f)
+                    val tx = (target.x - current.x) * density
+                    val ty = (target.y - current.y) * density
+                    morphing = true
                     appLog("切换最大化：放大 -> 还原 $target")
-                    win.setBounds(target)
-                    playMaximizeMorphAnimation(expanding = false)
+                    winOrigin = TransformOrigin(0f, 0f)
+                    transitionJob?.cancel()
+                    transitionJob = uiScope.launch {
+                        try {
+                            val ease = CubicBezierEasing(0.20f, 0.94f, 0.28f, 1f)
+                            animProgress.snapTo(0f)
+                            animProgress.animateTo(1f, tween(230, easing = ease)) {
+                                val t = value
+                                winScaleX = 1f + (sx - 1f) * t
+                                winScaleY = 1f + (sy - 1f) * t
+                                winOffsetX = tx * t
+                                winOffsetY = ty * t
+                            }
+                            // 缩小落点与 target 像素对齐后，单次切换回普通窗口尺寸并归零变换
+                            isMax = false
+                            resetVisualState()
+                            win.setBounds(target)
+                        } finally {
+                            morphing = false
+                        }
+                    }
                 }
             }
 
             fun unmaximizeForDrag(pointerScreenX: Int, pointerScreenY: Int) {
                 if (!isMax) return
                 transitionJob?.cancel()
+                morphing = false
                 resetVisualState()
                 val oldBounds = win.bounds
                 val restore = normalBounds ?: defaultCenteredBounds(win)
@@ -571,7 +559,6 @@ fun main(args: Array<String>) {
                     }
                 }
                 runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
-                runCatching { applyRoundedCorners(win) }
                 runCatching { win.rootPane.border = null }
 
                 win.addWindowStateListener { e ->
@@ -589,13 +576,10 @@ fun main(args: Array<String>) {
                 })
             }
 
-            // 首次显示（非托盘 showToken 触发）时：套用 Win11 圆角并播放丝滑弹出动画
+            // 首次显示（非托盘 showToken 触发）时播放丝滑弹出动画
             LaunchedEffect(isVisible) {
-                if (isVisible) {
-                    runCatching { applyRoundedCorners(win) }
-                    if (showToken == 0) {
-                        playEnterAnimation(fromTray = false)
-                    }
+                if (isVisible && showToken == 0) {
+                    playEnterAnimation(fromTray = false)
                 }
             }
 
@@ -606,18 +590,17 @@ fun main(args: Array<String>) {
                     (win.extendedState and java.awt.Frame.ICONIFIED) != 0
                 windowState.isMinimized = false
                 javax.swing.SwingUtilities.invokeLater {
-                    restoreLocationAndOpacity()
                     restoreAndFocusWindow(win, wasIconified)
                     playEnterAnimation(fromTray = lastHiddenToTray && !wasIconified)
                     appLog("托盘恢复窗口 #$showToken（wasIconified=$wasIconified, state=${win.extendedState}, visible=${win.isVisible}）")
                 }
             }
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(winCanvasBg),
-            ) {
+            val flushMaximized = isMax && !morphing
+            val winShape = G2RoundedShape(if (flushMaximized) 0.dp else 14.dp)
+            val winBorderColor = if (isDarkWin) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.11f)
+
+            Box(modifier = Modifier.fillMaxSize()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -628,7 +611,13 @@ fun main(args: Array<String>) {
                             alpha = winAlpha
                             translationX = winOffsetX
                             translationY = winOffsetY
-                        },
+                        }
+                        .clip(winShape)
+                        .background(winCanvasBg)
+                        .then(
+                            if (flushMaximized) Modifier
+                            else Modifier.border(1.dp, winBorderColor, winShape),
+                        ),
                 ) {
                     App(
                         settings = settings,
