@@ -12,7 +12,10 @@ Unicode true
 !include "FileFunc.nsh"
 
 !ifndef APP_VERSION
-  !define APP_VERSION "0.0.0"
+  !define APP_VERSION "3.3.0"
+!endif
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "3.3.0"
 !endif
 
 !define APP_NAME      "MCHOSE A7 V2 Ultra+ Battery"
@@ -35,7 +38,7 @@ SetCompressor /SOLID lzma
 ShowInstDetails show
 ShowUninstDetails show
 
-VIProductVersion "${APP_VERSION}.0"
+VIProductVersion "${PRODUCT_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "FileDescription" "${APP_NAME} 安装程序"
 VIAddVersionKey "FileVersion" "${APP_VERSION}"

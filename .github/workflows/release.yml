@@ -40,10 +40,14 @@ jobs:
           } elseif ($env:GITHUB_REF_NAME -match '^v(.+)$') {
             $ver = $Matches[1]
           } else {
-            $ver = "2.0.0"
+            $ver = "3.3.0"
           }
+          $baseVer = ($ver -split '[-+]')[0]
+          $isPre = ($ver -match '-').ToString().ToLower()
           echo "version=$ver" >> $env:GITHUB_OUTPUT
-          Write-Host "版本号: $ver"
+          echo "base_version=$baseVer" >> $env:GITHUB_OUTPUT
+          echo "prerelease=$isPre" >> $env:GITHUB_OUTPUT
+          Write-Host "版本号: $ver (base=$baseVer, prerelease=$isPre)"
 
       - name: 设置 UTF-8 编码（避免中文乱码）
         shell: pwsh
@@ -60,7 +64,7 @@ jobs:
       - name: 打包桌面分发（MSI）
         shell: pwsh
         run: |
-          .\gradlew.bat :app:packageDistributionForCurrentOS -PappVersion="${{ steps.version.outputs.version }}" --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath package-log.txt
+          .\gradlew.bat :app:packageDistributionForCurrentOS -PappVersion="${{ steps.version.outputs.base_version }}" --no-daemon --stacktrace 2>&1 | Tee-Object -FilePath package-log.txt
           exit $LASTEXITCODE
 
       - name: 生成安装向导（NSIS，中文，可选桌面快捷方式）
@@ -70,7 +74,7 @@ jobs:
           $env:Path += ";C:\Program Files (x86)\NSIS"
           # NSIS 不会自动创建输出目录
           New-Item -ItemType Directory -Force -Path dist | Out-Null
-          makensis -V3 /DAPP_VERSION="${{ steps.version.outputs.version }}" installer\setup.nsi 2>&1 | Tee-Object -FilePath nsis-log.txt
+          makensis -V3 /DAPP_VERSION="${{ steps.version.outputs.version }}" /DPRODUCT_VERSION="${{ steps.version.outputs.base_version }}" installer\setup.nsi 2>&1 | Tee-Object -FilePath nsis-log.txt
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Get-ChildItem dist | Select-Object Name, @{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 
@@ -116,7 +120,7 @@ jobs:
           $body += '## 下载'
           $body += ''
           $body += ('- **推荐**：`MCHOSE-A7V2UltraPlus-Battery-Setup-{0}.exe` —— 中文安装向导，可勾选「创建桌面快捷方式」「开机自动启动」，无需管理员权限' -f $ver)
-          $body += ('- **备用**：`MCHOSE-A7V2UltraPlus-Battery-{0}.msi` —— Windows Installer（英文向导）' -f $ver)
+          $body += ('- **备用**：`MCHOSE-A7V2UltraPlus-Battery-{0}.msi` —— Windows Installer（英文向导）' -f "${{ steps.version.outputs.base_version }}")
           $body += ''
           $body += '## 说明'
           $body += ''
@@ -139,5 +143,5 @@ jobs:
             app/build/compose/binaries/**/*.msi
             app/build/compose/binaries/**/*.zip
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease == 'true' }}
           fail_on_unmatched_files: false

@@ -1,7 +1,9 @@
 package top.ackd7.mchose
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -13,11 +15,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -30,11 +34,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,11 +59,16 @@ import top.ackd7.mchose.services.UpdateChecker
 import top.ackd7.mchose.services.UpdateInfo
 import top.ackd7.mchose.ui.App
 import top.ackd7.mchose.ui.AppTheme
+import top.ackd7.mchose.ui.mochi.G2RoundedShape
+import top.ackd7.mchose.ui.mochi.MochiStatusPill
+import top.ackd7.mchose.ui.mochi.mochiPressScale
+import top.ackd7.mchose.ui.mochi.rememberMochiColors
+import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.2.4"
+const val APP_VERSION = "3.3.0-beta.1"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -213,7 +224,7 @@ fun main(args: Array<String>) {
             size = if (args.contains("--narrow")) DpSize(460.dp, 700.dp)
             else DpSize(880.dp, 560.dp),
         )
-        val menuState = rememberWindowState(size = DpSize(180.dp, 148.dp))
+        val menuState = rememberWindowState(size = DpSize(196.dp, 184.dp))
 
         fun openMainWindow() {
             menuVisible = false
@@ -378,6 +389,7 @@ fun main(args: Array<String>) {
                         window = win,
                         title = APP_NAME,
                         subtitle = "v$APP_VERSION",
+                        battery = battery,
                         isMaximized = isMax,
                         onMinimize = {
                             // 通过 windowState 最小化，保证 Compose 状态与底层窗口同步
@@ -446,6 +458,7 @@ fun main(args: Array<String>) {
             }
             AppTheme(themeModeOf(themeMode)) {
                 TrayMenu(
+                    battery = battery,
                     onOpen = { openMainWindow() },
                     onRefresh = { menuVisible = false; monitor.requestRefresh() },
                     onExit = { shutdownApp() },
@@ -455,55 +468,102 @@ fun main(args: Array<String>) {
     }
 }
 
-// ---------------- 自绘标题栏 ----------------
+// ---------------- 融入式无边框标题栏 ----------------
 
 @Composable
 private fun AppTitleBar(
     window: java.awt.Window,
     title: String,
     subtitle: String,
+    battery: BatteryInfo,
     isMaximized: Boolean,
     onMinimize: () -> Unit,
     onToggleMaximize: () -> Unit,
     onClose: () -> Unit,
 ) {
+    val c = rememberMochiColors()
+    val canvasBg = if (c.isDark) Color(0xFF0F1218) else Color(0xFFF2F5FA)
+    val appIcon = rememberAppIconBitmap()
+
+    val ok = battery.success && battery.percent >= 0
+    val sleeping = battery.stale || !battery.success
+    val pillColor = when {
+        sleeping -> Color(0xFF64748B)
+        battery.charging -> c.success
+        battery.percent >= 50 -> c.accent
+        battery.percent >= 20 -> c.warning
+        else -> c.danger
+    }
+    val pillText = when {
+        sleeping && ok -> "${battery.percent}% · Zzz"
+        sleeping -> "休眠 Zzz"
+        battery.charging -> "${battery.percent}% · 充电中"
+        else -> "${battery.percent}%"
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .background(MiuixTheme.colorScheme.surface)
-            .padding(start = 16.dp, end = 6.dp),
+            .height(54.dp)
+            .background(canvasBg)
+            .padding(start = 18.dp, end = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
                 .dragWindow(window) { onToggleMaximize() },
-            verticalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(title, fontSize = 15.sp, color = MiuixTheme.colorScheme.onSurface)
-            Text(
-                subtitle,
-                fontSize = 11.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            if (appIcon != null) {
+                Image(
+                    bitmap = appIcon,
+                    contentDescription = title,
+                    modifier = Modifier
+                        .size(26.dp)
+                        .clip(G2RoundedShape(7.dp)),
+                )
+                Spacer(Modifier.width(10.dp))
+            }
+            Column(verticalArrangement = Arrangement.Center) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = title,
+                        fontSize = 14.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = c.text,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = subtitle,
+                        fontSize = 11.sp,
+                        color = c.secondary,
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            MochiStatusPill(
+                text = pillText,
+                dotColor = pillColor,
+                emphasized = !sleeping,
             )
         }
 
-        WindowButton(onClick = onMinimize) { c ->
-            strokeLine(c, Offset(size.width * 0.15f, size.height / 2f), Offset(size.width * 0.85f, size.height / 2f), 1.6f)
+        WindowButton(onClick = onMinimize) { stroke ->
+            strokeLine(stroke, Offset(size.width * 0.15f, size.height / 2f), Offset(size.width * 0.85f, size.height / 2f), 1.6f)
         }
-        WindowButton(onClick = onToggleMaximize) { c ->
+        WindowButton(onClick = onToggleMaximize) { stroke ->
             if (isMaximized) {
-                drawRect(c, Offset(size.width * 0.08f, size.height * 0.3f), Size(size.width * 0.58f, size.height * 0.58f), style = Stroke(1.5f))
-                drawRect(c, Offset(size.width * 0.3f, size.height * 0.08f), Size(size.width * 0.58f, size.height * 0.58f), style = Stroke(1.5f))
+                drawRect(stroke, Offset(size.width * 0.08f, size.height * 0.3f), Size(size.width * 0.58f, size.height * 0.58f), style = Stroke(1.5f))
+                drawRect(stroke, Offset(size.width * 0.3f, size.height * 0.08f), Size(size.width * 0.58f, size.height * 0.58f), style = Stroke(1.5f))
             } else {
-                drawRect(c, Offset(size.width * 0.15f, size.height * 0.15f), Size(size.width * 0.7f, size.height * 0.7f), style = Stroke(1.5f))
+                drawRect(stroke, Offset(size.width * 0.15f, size.height * 0.15f), Size(size.width * 0.7f, size.height * 0.7f), style = Stroke(1.5f))
             }
         }
-        WindowButton(onClick = onClose, isClose = true) { c ->
-            strokeLine(c, Offset(size.width * 0.22f, size.height * 0.22f), Offset(size.width * 0.78f, size.height * 0.78f), 1.6f)
-            strokeLine(c, Offset(size.width * 0.78f, size.height * 0.22f), Offset(size.width * 0.22f, size.height * 0.78f), 1.6f)
+        WindowButton(onClick = onClose, isClose = true) { stroke ->
+            strokeLine(stroke, Offset(size.width * 0.22f, size.height * 0.22f), Offset(size.width * 0.78f, size.height * 0.78f), 1.6f)
+            strokeLine(stroke, Offset(size.width * 0.78f, size.height * 0.22f), Offset(size.width * 0.22f, size.height * 0.78f), 1.6f)
         }
     }
 }
@@ -574,26 +634,28 @@ private fun WindowButton(
     isClose: Boolean = false,
     draw: DrawScope.(Color) -> Unit,
 ) {
+    val c = rememberMochiColors()
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val bg = when {
-        hovered && isClose -> Color(0xFFE5484D)
-        hovered -> MiuixTheme.colorScheme.surfaceContainerHigh
+        hovered && isClose -> c.danger
+        hovered -> c.fill
         else -> Color.Transparent
     }
-    val stroke = if (hovered && isClose) Color.White else MiuixTheme.colorScheme.onSurface
+    val stroke = if (hovered && isClose) Color.White else c.text.copy(alpha = 0.85f)
 
     Box(
         modifier = Modifier
-            .padding(horizontal = 5.dp)
-            .size(28.dp)
-            .clip(RoundedCornerShape(8.dp))
+            .padding(horizontal = 3.dp)
+            .size(30.dp)
+            .mochiPressScale(interaction, pressedScale = 0.90f)
+            .clip(G2RoundedShape(9.dp))
             .background(bg)
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(11.dp)) {
+        Canvas(modifier = Modifier.size(10.5.dp)) {
             draw(stroke)
         }
     }
@@ -604,49 +666,103 @@ private fun DrawScope.strokeLine(color: Color, start: Offset, end: Offset, width
     drawLine(color = color, start = start, end = end, strokeWidth = width, cap = StrokeCap.Round)
 }
 
-// ---------------- 托盘右键菜单 ----------------
+// ---------------- Liquid Glass 托盘右键菜单 ----------------
 
 @Composable
 private fun TrayMenu(
+    battery: BatteryInfo,
     onOpen: () -> Unit,
     onRefresh: () -> Unit,
     onExit: () -> Unit,
 ) {
+    val c = rememberMochiColors()
+    val ok = battery.success && battery.percent >= 0
+    val sleeping = battery.stale || !battery.success
+    val statusSummary = when {
+        sleeping && ok -> "电量 ${battery.percent}% · 休眠中"
+        sleeping -> "设备休眠 / 未连接"
+        battery.charging -> "电量 ${battery.percent}% · 充电中"
+        else -> "电量 ${battery.percent}% · 放电中"
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(148.dp)
-            .background(MiuixTheme.colorScheme.surfaceContainer)
-            .padding(vertical = 6.dp),
+            .height(184.dp)
+            .background(c.glassSurface)
+            .border(
+                1.dp,
+                Brush.verticalGradient(listOf(c.glassBorderTop, c.glassBorderBottom)),
+                RoundedCornerShape(10.dp),
+            )
+            .padding(6.dp),
     ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+        ) {
+            Text(
+                text = statusSummary,
+                fontSize = 11.5.sp,
+                fontWeight = FontWeight.Medium,
+                color = c.secondary,
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 3.dp)
+                .height(1.dp)
+                .background(c.divider),
+        )
         TrayMenuItem("打开面板", onOpen)
         TrayMenuItem("立即刷新", onRefresh)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .padding(horizontal = 8.dp, vertical = 4.dp)
                 .height(1.dp)
-                .background(MiuixTheme.colorScheme.dividerLine),
+                .background(c.divider),
         )
-        TrayMenuItem("退出", onExit)
+        TrayMenuItem("退出程序", onExit, danger = true)
     }
 }
 
 @Composable
-private fun TrayMenuItem(text: String, onClick: () -> Unit) {
+private fun TrayMenuItem(
+    text: String,
+    onClick: () -> Unit,
+    danger: Boolean = false,
+) {
+    val c = rememberMochiColors()
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val itemShape = G2RoundedShape(10.dp)
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
-            .background(if (hovered) MiuixTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
+            .height(38.dp)
+            .mochiPressScale(interaction, pressedScale = 0.96f)
+            .clip(itemShape)
+            .background(
+                when {
+                    hovered && danger -> c.danger.copy(alpha = 0.14f)
+                    hovered -> c.cardHover
+                    else -> Color.Transparent
+                },
+            )
             .hoverable(interaction)
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 12.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
-        Text(text, fontSize = 14.sp, color = MiuixTheme.colorScheme.onSurface)
+        Text(
+            text = text,
+            fontSize = 13.5.sp,
+            fontWeight = if (hovered) FontWeight.Medium else FontWeight.Normal,
+            color = if (danger) c.danger else c.text,
+        )
     }
 }
 
