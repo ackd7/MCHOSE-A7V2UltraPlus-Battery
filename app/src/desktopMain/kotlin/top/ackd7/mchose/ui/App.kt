@@ -155,7 +155,7 @@ fun App(
         val mouseState = rememberMouseConfigUiState(settings)
 
         LaunchedEffect(Unit) {
-            top.ackd7.mchose.appLog("UI 已组合（Miuix × Mochi Liquid Glass）")
+            top.ackd7.mchose.appLog("UI 已组合（Miuix × Mochi）")
             mouseState.refresh()
         }
 
@@ -634,8 +634,10 @@ class MouseConfigUiState(
     private val mouse: MouseConfigService,
     private val scope: CoroutineScope,
 ) {
-    val dpiText = mutableStateListOf(*settings.dpiStages.map { it.toString() }.toTypedArray())
-    var activeDpiIndex by mutableIntStateOf(settings.activeDpiIndex)
+    val dpiText = mutableStateListOf(
+        *Array(6) { i -> settings.dpiStages.getOrElse(i) { 800 }.toString() },
+    )
+    var activeDpiIndex by mutableIntStateOf(settings.activeDpiIndex.coerceIn(0, 5))
     var rateIndex by mutableIntStateOf(rateIndexFromHz(settings.rateHz))
     var status by mutableStateOf("")
     var statusIsError by mutableStateOf(false)
@@ -647,11 +649,11 @@ class MouseConfigUiState(
     var loaded by mutableStateOf(false)
         private set
 
-    fun stageValue(index: Int): Int = dpiText[index].trim().toIntOrNull() ?: 800
+    fun stageValue(index: Int): Int = dpiText[index.coerceIn(0, 5)].trim().toIntOrNull() ?: 800
 
     fun setStageValue(index: Int, value: Int) {
         val aligned = ((value.coerceIn(100, 42000) + 5) / 10) * 10
-        dpiText[index] = aligned.coerceIn(100, 42000).toString()
+        dpiText[index.coerceIn(0, 5)] = aligned.coerceIn(100, 42000).toString()
     }
 
     fun stepStageValue(index: Int, delta: Int) {
@@ -1278,7 +1280,7 @@ private fun SettingsPage(
             )
             MochiRow(
                 title = "托盘显示电量数字",
-                subtitle = "关闭后托盘仅展示胶囊图标",
+                subtitle = "关闭后托盘隐藏实时电量数字",
                 divider = false,
                 trailing = {
                     MochiSwitch(

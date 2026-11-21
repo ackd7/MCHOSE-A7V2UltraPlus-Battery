@@ -187,7 +187,11 @@ object HidNative {
         private val handle: WinNT.HANDLE
         private val evt: WinNT.HANDLE
         private val inputLen: Int = maxOf(inputLen, 1)
+        @Volatile
         private var closed = false
+        @Volatile
+        var disconnected: Boolean = false
+            private set
 
         init {
             val access = if (readOnly) WinNT.GENERIC_READ else (WinNT.GENERIC_READ or WinNT.GENERIC_WRITE)
@@ -208,7 +212,7 @@ object HidNative {
         fun setOutputReport(report: ByteArray): Boolean = hid.HidD_SetOutputReport(handle, report, report.size)
 
         fun read(timeoutMs: Int): ByteArray? {
-            if (closed) return null
+            if (closed || disconnected) return null
             Kernel32.INSTANCE.ResetEvent(evt)
             val ov = WinBase.OVERLAPPED()
             ov.hEvent = evt
@@ -217,13 +221,19 @@ object HidNative {
             val ok = Kernel32.INSTANCE.ReadFile(handle, buf, inputLen, read, ov)
             if (!ok) {
                 val err = Native.getLastError()
-                if (err != ERROR_IO_PENDING) return null
+                if (err != ERROR_IO_PENDING) {
+                    disconnected = true
+                    return null
+                }
                 if (Kernel32.INSTANCE.WaitForSingleObject(evt, timeoutMs) != 0) {
                     kernel32Extra.CancelIoEx(handle, ov)
                     kernel32Extra.GetOverlappedResult(handle, ov, IntByReference(), true)
                     return null
                 }
-                if (!kernel32Extra.GetOverlappedResult(handle, ov, read, false)) return null
+                if (!kernel32Extra.GetOverlappedResult(handle, ov, read, false)) {
+                    disconnected = true
+                    return null
+                }
             }
             if (read.value <= 0) return null
             return buf.copyOf(read.value)
