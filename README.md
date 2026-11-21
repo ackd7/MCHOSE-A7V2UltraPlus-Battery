@@ -100,10 +100,10 @@ DPI / 回报率（同一协议族的厂商命令）：
 .\gradlew.bat :app:compileKotlinDesktop
 
 # 打包 MSI（产物：app/build/compose/binaries/main/msi/）
-.\gradlew.bat :app:packageMsi -PappVersion=4.1.1
+.\gradlew.bat :app:packageMsi -PappVersion=4.1.2
 
 # 打中文安装向导（需先装 NSIS，产物：dist/）
-makensis /DAPP_VERSION=4.1.1 /DPRODUCT_VERSION=4.1.1 installer/setup.nsi
+makensis /DAPP_VERSION=4.1.2 /DPRODUCT_VERSION=4.1.2 installer/setup.nsi
 
 # 硬件自检（枚举设备、读电量、读配置）
 .\gradlew.bat :app:diag
@@ -239,10 +239,10 @@ Requires **JDK 21** (`gradlew` downloads Gradle 9.x automatically).
 .\gradlew.bat :app:compileKotlinDesktop
 
 # Build MSI package (output: app/build/compose/binaries/main/msi/)
-.\gradlew.bat :app:packageMsi -PappVersion=4.1.1
+.\gradlew.bat :app:packageMsi -PappVersion=4.1.2
 
 # Build NSIS Setup installer (requires NSIS, output: dist/)
-makensis /DAPP_VERSION=4.1.1 /DPRODUCT_VERSION=4.1.1 installer/setup.nsi
+makensis /DAPP_VERSION=4.1.2 /DPRODUCT_VERSION=4.1.2 installer/setup.nsi
 
 # Run hardware diagnostics (enumerate HID devices, read battery & config)
 .\gradlew.bat :app:diag
