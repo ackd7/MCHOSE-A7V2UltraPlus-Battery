@@ -1453,6 +1453,10 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "3.3.0-beta.2" to listOf(
+        "任务栏托盘图标升级为 1:1 圆角正方形透明边框 + 超大号数字，小尺寸清晰度大幅提升",
+        "充电时右上角显示翠绿圆形闪电角标，不挤占中央数字空间；休眠保持 Zzz 透明方框",
+    ),
     "3.3.0-beta.1" to listOf(
         "参考 miuix 与 mochi-compose 全新重设计 UI：G2 连续超椭圆、Liquid Glass 液态玻璃质感与弹簧动效",
         "全新扁平化无线鼠标应用图标 + HyperOS 透明胶囊电池托盘图标（休眠显示 Zzz）",
