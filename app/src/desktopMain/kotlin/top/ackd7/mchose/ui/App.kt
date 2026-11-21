@@ -1453,6 +1453,10 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "3.3.0-beta.3" to listOf(
+        "修复 4K / 高 DPI 缩放（如 175% / 200%）下托盘图标模糊的问题：改用 MultiResolutionImage 1:1 物理像素直绘",
+        "收紧托盘边框外边距并大幅放大 Segoe UI 粗体数字字号，任务栏清晰度与视觉大小显著提升",
+    ),
     "3.3.0-beta.2" to listOf(
         "任务栏托盘图标升级为 1:1 圆角正方形透明边框 + 超大号数字，小尺寸清晰度大幅提升",
         "充电时右上角显示翠绿圆形闪电角标，不挤占中央数字空间；休眠保持 Zzz 透明方框",
