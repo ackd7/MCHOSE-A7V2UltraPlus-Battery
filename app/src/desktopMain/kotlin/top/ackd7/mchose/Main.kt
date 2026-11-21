@@ -192,20 +192,17 @@ fun main(args: Array<String>) {
         fun syncTrayIcon(info: BatteryInfo) {
             val t = tray ?: return
             javax.swing.SwingUtilities.invokeLater {
-                if (settings.showPercentInTray && info.success && info.percent >= 0) {
-                    t.setIcon(
-                        info.percent,
-                        info.charging,
-                        APP_NAME + "  ${info.percent}%" +
-                            (if (info.stale) "（休眠，上次读数）" else if (info.charging) "  充电中" else "  放电中"),
-                    )
+                val hasReading = info.success && info.percent >= 0
+                val tip = if (hasReading) {
+                    APP_NAME + "  ${info.percent}%" +
+                        (if (info.stale) "（休眠，上次读数）" else if (info.charging) "  充电中" else "  放电中")
                 } else {
-                    val tip = if (info.success && info.percent >= 0) {
-                        APP_NAME + "  ${info.percent}%" +
-                            (if (info.stale) "（休眠，上次读数）" else if (info.charging) "  充电中" else "  放电中")
-                    } else {
-                        "$APP_NAME（设备休眠/未连接）"
-                    }
+                    "$APP_NAME（休眠 / 未连接）"
+                }
+                if (settings.showPercentInTray && hasReading && !info.stale) {
+                    t.setIcon(info.percent, info.charging, tip)
+                } else {
+                    // 休眠、未连接或关闭电量数字显示时展示透明 Zzz 胶囊
                     t.setIcon(null, false, tip)
                 }
             }
@@ -322,6 +319,12 @@ fun main(args: Array<String>) {
             var isMax by remember { mutableStateOf(false) }
 
             LaunchedEffect(Unit) {
+                runCatching {
+                    val iconStream = ClassLoader.getSystemResourceAsStream("app.png")
+                    if (iconStream != null) {
+                        win.iconImage = iconStream.use { javax.imageio.ImageIO.read(it) }
+                    }
+                }
                 runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
                 runCatching { applyRoundedCorners(win) }
                 // 去掉 Swing 默认边框，避免无边框窗口右/下缘出现一条细线
