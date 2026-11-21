@@ -18,15 +18,16 @@
 
 **电量看得准**
 
-- 直接读取 HID 厂商协议返回的 **0–100% 原始电量值**，不四舍五入、不估算
-- 区分 **充电中 / 放电中**，识别 **USB 有线 / 2.4G 无线 / 蓝牙**
+- 直接读取 HID 厂商协议返回的 **0–100% 原始电量值**，结合**双采样防抖确认**与无线在线位（`linked`）校验，减少唤醒抖动与离线脏读数
+- **充电电压虚高平滑**：插电瞬间锂电池端电压抬升导致固件直报 100% 时自动按充电速率平滑显示（并透明标注原始值），待固件确认「已充满」后准确显示 100%
+- 区分 **充电中 / 已充满 / 放电中**，识别 **USB 有线 / 2.4G 无线 / 蓝牙**，后台只读监听 `Report 0x13` 主动推送实现插拔充电线秒级感知
 - 鼠标休眠时固件会返回全 0，程序**保留上一次成功读数与实际更新时间**并标注「休眠中」，不会突然变成 `--`
 - **4K 高清 1:1 托盘小图标**：圆角正方形透明边框 + 大号 `Segoe UI` 粗体数字（按高/充/中/低电量变色，充电时右上角带翠绿闪电角标，休眠显示 `Zzz`），自动适配 Windows 深/浅任务栏与任意 DPI 缩放
 
 **鼠标配置能改**
 
 - **DPI**：3×2 可视化档位矩阵一目了然，点选即切换当前档；提供快捷预设 Chips、完整下拉及**自定义 100–42000（支持 ±100 微调）**
-- **回报率**：3×2 可视化胶囊矩阵（125 / 500 / 1000 / 2000 / 4000 / 8000 Hz），写入后掉电不丢
+- **回报率**：3×2 可视化胶囊矩阵（125 / 500 / 1000 / 2000 / 4000 / 8000 Hz），**支持启动自动回读**，写入后掉电不丢
 - 启动时**自动读取**当前配置，切页或重开窗口不丢失；HID 读写加互斥锁，避免与电量轮询并发冲突
 
 **用起来省心**
@@ -58,20 +59,21 @@
 - `SET_FEATURE(reportId=0x11, ~cmd, 0xFF...)`：`0x03` = bond 唤醒，`0x06` = ost 查询
 - 每个命令后固件回 interrupt-IN ACK（`e5 03` / `e5 06`），随后轮询 `GET_FEATURE`
 - Feature 在两个 bank 间交替（XOR `0xFF` 与明文），解码后 payload：
-  `[0..1]` VID、`[8] & 7` 连接方式、`[9]` 电量百分比、`[10]` 充电状态
+  `[0..1]` VID、`[8] & 7` 连接方式、`[8] & 0x08` 无线在线位（`linked`）、`[9]` 电量百分比、`[10]` 充电状态（`0` 放电 / `1` 充电中 / `2` 已充满）
 
 DPI / 回报率（同一协议族的厂商命令）：
 
 - 写 DPI `SET_FEATURE(0x11, ~0x40, ...)`：有线/2.4G 档位 + 6 档原始 DPI（u16 LE）+ 启用档数
 - 写回报率 `SET_FEATURE(0x11, ~0x41, usbRate, freeRate)`：8K 型号 `0→125, 1→500, 2→1000, 3→2000, 4→4000, 5→8000 Hz`
-- 读完整配置 `SET/GET_FEATURE(0x12, ~0x67)`：解析 6 档 DPI 与当前档位索引
+- 读完整配置 `SET/GET_FEATURE(0x12, ~0x67)`：解析 6 档 DPI、当前档位（低 4 位）与无线/有线回报率（高 4 位）
+- 设备主动推送 `Report 0x13`（XOR `0xFF`，子类型 `0xE2` / `0x1D`）：原始报文 `raw[4]` 充电状态、`raw[5]` 电量百分比
 
-两个已知限制：
+已知注意事项：
 
-- **回报率不可回读**：`0x12 0x67` 报告中不含回报率字段（实测写入后回读字节不变），界面显示本地记录值
 - **读取校验**：休眠或半截数据会返回乱值，程序校验六档全部落在 100–42000 且为 10 的整数倍，否则视为失败重试
+- **充电电压平滑**：无线鼠标充电瞬间端电压抬升会让固件直接报 100%，程序在 `chargeStatus == 1`（充电中未满）时自动平滑，直到 `chargeStatus == 2`（已充满）
 
-> 协议参考了 [sdparklab/Voltide](https://github.com/sdparklab/Voltide)（MIT）对 MCHOSE A5 / A7 Ultra 的逆向工作，以及 [icepie/mchose-linux](https://github.com/icepie/mchose-linux) 的 `PROTOCOL.md`（DPI / 回报率），特此致谢。
+> 协议参考并感谢 [sdparklab/Voltide](https://github.com/sdparklab/Voltide)、[icepie/mchose-linux](https://github.com/icepie/mchose-linux)、[Tensyd/mchose-battery](https://github.com/Tensyd/mchose-battery)、[LORQAQ/mchose-tray](https://github.com/LORQAQ/mchose-tray) 与 [HifumiDaisuki01/MchoseBatteryTray](https://github.com/HifumiDaisuki01/MchoseBatteryTray) 等社区开源项目。
 
 ### 下载与运行
 
@@ -98,10 +100,10 @@ DPI / 回报率（同一协议族的厂商命令）：
 .\gradlew.bat :app:compileKotlinDesktop
 
 # 打包 MSI（产物：app/build/compose/binaries/main/msi/）
-.\gradlew.bat :app:packageMsi -PappVersion=4.0.0
+.\gradlew.bat :app:packageMsi -PappVersion=4.1.0
 
 # 打中文安装向导（需先装 NSIS，产物：dist/）
-makensis /DAPP_VERSION=4.0.0 /DPRODUCT_VERSION=4.0.0 installer/setup.nsi
+makensis /DAPP_VERSION=4.1.0 /DPRODUCT_VERSION=4.1.0 installer/setup.nsi
 
 # 硬件自检（枚举设备、读电量、读配置）
 .\gradlew.bat :app:diag
@@ -155,31 +157,33 @@ Rewritten in **Kotlin + Compose Multiplatform** (migrated from WPF in v2.0), ins
 
 **Accurate Battery Monitoring**
 
-- Reads the raw **0–100% battery percentage** directly from the vendor HID protocol (no rounding or estimation)
-- Distinguishes **Charging / Discharging** and detects **USB Wired / 2.4G Wireless / Bluetooth**
+- Reads the raw **0–100% battery percentage** directly from the vendor HID protocol, with **two-sample debounce confirmation** and wireless online bit (`linked`) validation to eliminate wake-up jitter and stale offline frames
+- **Charging Voltage Spike Smoothing**: Suppresses the firmware's instant jump to 100% caused by lithium terminal voltage rise when plugged in, ramping smoothly by real elapsed time (while transparently displaying the raw firmware value) until the firmware reports *Full*
+- Distinguishes **Charging / Full / Discharging** and detects **USB Wired / 2.4G Wireless / Bluetooth**, with a background read-only listener for proactive `Report 0x13` pushes for instant plug/unplug updates
 - Preserves the **last valid reading and timestamp** labeled as *Sleeping* when the mouse enters sleep mode (firmware reports all zeros), instead of dropping to `--`
-- Renders the live percentage directly in the system tray icon (color-coded by level, with a lightning bolt while charging)
+- **4K HiDPI 1:1 Tray Icon**: Rounded-square transparent border + large bold `Segoe UI` digits (color-coded by level, emerald lightning badge while charging, `Zzz` while sleeping), adapting cleanly to light/dark taskbars and any DPI scaling
 
 **Mouse Configuration**
 
-- **DPI**: Displays all 6 DPI stages at a glance; click any row to select the active stage, pick a preset, or enter a **custom value (100–42000)**
-- **Polling Rate**: Supports **125 / 500 / 1000 / 2000 / 4000 / 8000 Hz**, persisted in onboard mouse memory
-- **Auto-read on startup**: Loads current DPI stages automatically and shares a mutex lock on the HID channel so configuration writes never collide with battery polling
+- **DPI**: Visual 3×2 stage grid showing all 6 stages at a glance; click any card to select the active stage, pick a quick preset chip or dropdown value, or enter a **custom value (100–42000, ±100 stepper)**
+- **Polling Rate**: Visual 3×2 pill grid (**125 / 500 / 1000 / 2000 / 4000 / 8000 Hz**), **auto-read on startup**, persisted in onboard mouse memory
+- **Auto-read on startup**: Loads current DPI stages and polling rate automatically and shares a mutex lock on the HID channel so configuration writes never collide with battery polling
 
 **Everyday Convenience**
 
-- **System Tray Resident**: Left-click the tray icon to open or restore the main window; right-click for Open / Refresh / Exit
+- **Single-Instance Guard**: Re-launching the shortcut brings the existing tray window to the foreground instead of spawning duplicates
+- **System Tray Resident**: Left-click the tray icon to open or restore the main window; right-click for status summary and Open / Refresh / Exit
 - **Silent Autostart**: Registers a per-user Windows Run entry (no admin privileges required) with `--minimized`, starting silently in the system tray without popping up the main window
 - **Low-Battery Alert**: Sends a tray notification once when battery drops to or below the threshold (10–50%, default 30%) and automatically re-arms after charging back up
 - **Refresh Interval**: Configurable 15 / 30 / 90 s intervals applied immediately; manual refresh runs asynchronously in the background
 - **Update Checker**: Checks GitHub Releases on startup (can be toggled off) and includes an in-app changelog viewer
 
-**Interface**
+**Interface & Motion**
 
-- Responsive horizontal layout: two-column view on wide windows, automatically collapsing to single-column when narrow
+- Pure solid-color **G2 continuous squircle** cards with responsive horizontal layout (two-column on wide windows, single-column when narrow)
 - **Light / Dark / Follow System** themes applied instantly to both the main window and the custom tray context menu
-- Smooth horizontal page transitions and spring pop-in dropdown menus
-- Borderless window with custom title bar controls, drag-to-move, double-click to maximize, and Windows 11 rounded corners
+- Smooth **open / minimize / maximize (respecting taskbar work area) / close** window animations, plus spring press feedback and horizontal page transitions
+- Borderless window with custom title bar controls, live battery pill, drag-to-move, double-click to maximize, and Windows 11 rounded corners
 
 ### Supported Device
 
@@ -194,20 +198,21 @@ Battery (`0x11` report family):
 - `SET_FEATURE(reportId=0x11, ~cmd, 0xFF...)`: `0x03` = bond wake-up, `0x06` = ost status query
 - Firmware replies with interrupt-IN ACKs (`e5 03` / `e5 06`), followed by polling `GET_FEATURE`
 - Feature reports alternate between two banks (XOR `0xFF` and plaintext). Decoded payload:
-  `[0..1]` VID, `[8] & 7` connection mode, `[9]` battery percentage, `[10]` charging flag
+  `[0..1]` VID, `[8] & 7` connection mode, `[8] & 0x08` wireless online bit (`linked`), `[9]` battery percentage, `[10]` charge state (`0` discharging / `1` charging / `2` full)
 
 DPI / Polling Rate (same vendor report family):
 
 - Write DPI `SET_FEATURE(0x11, ~0x40, ...)`: wired/2.4G active index + 6 raw DPI values (`u16 LE`) + active stage count
 - Write polling rate `SET_FEATURE(0x11, ~0x41, usbRate, freeRate)`: `0→125, 1→500, 2→1000, 3→2000, 4→4000, 5→8000 Hz`
-- Read full config `SET/GET_FEATURE(0x12, ~0x67)`: parses the 6 DPI stages and active stage index
+- Read full config `SET/GET_FEATURE(0x12, ~0x67)`: parses the 6 DPI stages, active stage index (low nibble), and wireless/wired polling rates (high nibble)
+- Proactive device push `Report 0x13` (XOR `0xFF`, subtype `0xE2` / `0x1D`): `raw[4]` charge state, `raw[5]` battery percentage
 
-Known limitations:
+Known notes:
 
-- **Polling rate cannot be read back**: The `0x12 0x67` report on the A7 V2 Ultra+ does not expose the current polling rate, so the UI displays the locally saved value.
 - **Read validation**: Sleep/partial frames may contain garbage bytes; all 6 DPI values must fall within `100..42000` and be multiples of 10, otherwise the read is retried.
+- **Charging voltage smoothing**: Terminal voltage rise upon plugging in can cause the firmware to jump straight to 100%; the app smooths readings while `chargeStatus == 1` (charging) until `chargeStatus == 2` (full).
 
-> Protocol details build upon the reverse-engineering work of [sdparklab/Voltide](https://github.com/sdparklab/Voltide) (MIT) for MCHOSE A5/A7 Ultra and [icepie/mchose-linux](https://github.com/icepie/mchose-linux) (`PROTOCOL.md`).
+> Protocol details build upon community reverse-engineering work from [sdparklab/Voltide](https://github.com/sdparklab/Voltide), [icepie/mchose-linux](https://github.com/icepie/mchose-linux), [Tensyd/mchose-battery](https://github.com/Tensyd/mchose-battery), [LORQAQ/mchose-tray](https://github.com/LORQAQ/mchose-tray), and [HifumiDaisuki01/MchoseBatteryTray](https://github.com/HifumiDaisuki01/MchoseBatteryTray).
 
 ### Download & Usage
 
@@ -234,10 +239,10 @@ Requires **JDK 21** (`gradlew` downloads Gradle 9.x automatically).
 .\gradlew.bat :app:compileKotlinDesktop
 
 # Build MSI package (output: app/build/compose/binaries/main/msi/)
-.\gradlew.bat :app:packageMsi -PappVersion=4.0.0
+.\gradlew.bat :app:packageMsi -PappVersion=4.1.0
 
 # Build NSIS Setup installer (requires NSIS, output: dist/)
-makensis /DAPP_VERSION=4.0.0 /DPRODUCT_VERSION=4.0.0 installer/setup.nsi
+makensis /DAPP_VERSION=4.1.0 /DPRODUCT_VERSION=4.1.0 installer/setup.nsi
 
 # Run hardware diagnostics (enumerate HID devices, read battery & config)
 .\gradlew.bat :app:diag
@@ -260,4 +265,4 @@ makensis /DAPP_VERSION=4.0.0 /DPRODUCT_VERSION=4.0.0 installer/setup.nsi
 
 - 更新日志 / Full changelog: [CHANGELOG.md](CHANGELOG.md)
 - 开源协议 / License: MIT License — see [LICENSE](LICENSE)
-- 致谢 / Credits: UI powered by [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix) (Apache-2.0) and inspired by [mochi-compose](https://github.com/feice11/mochi-compose); HID protocol informed by [sdparklab/Voltide](https://github.com/sdparklab/Voltide) and [icepie/mchose-linux](https://github.com/icepie/mchose-linux).
+- 致谢 / Credits: UI powered by [compose-miuix-ui/miuix](https://github.com/compose-miuix-ui/miuix) (Apache-2.0) and inspired by [mochi-compose](https://github.com/feice11/mochi-compose); HID protocol informed by [sdparklab/Voltide](https://github.com/sdparklab/Voltide), [icepie/mchose-linux](https://github.com/icepie/mchose-linux), [Tensyd/mchose-battery](https://github.com/Tensyd/mchose-battery), [LORQAQ/mchose-tray](https://github.com/LORQAQ/mchose-tray), and [HifumiDaisuki01/MchoseBatteryTray](https://github.com/HifumiDaisuki01/MchoseBatteryTray).

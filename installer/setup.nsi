@@ -12,10 +12,10 @@ Unicode true
 !include "FileFunc.nsh"
 
 !ifndef APP_VERSION
-  !define APP_VERSION "4.0.0"
+  !define APP_VERSION "4.1.0"
 !endif
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "4.0.0"
+  !define PRODUCT_VERSION "4.1.0"
 !endif
 
 !define APP_NAME      "MCHOSE A7 V2 Ultra+ Battery"

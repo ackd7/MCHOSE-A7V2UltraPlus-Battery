@@ -46,14 +46,19 @@ fun main() {
     println()
     println("=== 读取电量 ===")
     val info = MchoseBatteryReader().read()
-    println("success=${info.success} percent=${info.percent} charging=${info.charging} mode=${info.mode}")
+    println("success=${info.success} percent=${info.percent} rawPercent=${info.rawPercent} chargeState=${info.chargeState} linked=${info.linked} mode=${info.mode}")
     println("raw=${info.raw}")
     println("error=${info.error}")
 
     println()
     println("=== 读取鼠标配置（只读）===")
     val cfg = MouseConfigService().read()
-    println("success=${cfg.success} activeDpiIndex=${cfg.activeDpiIndex} dpi=${cfg.dpiStages.joinToString()}")
+    println(
+        "success=${cfg.success} activeDpiIndex=${cfg.activeDpiIndex} " +
+            "wirelessRate=${MouseConfigService.rateLabel(cfg.wirelessRateIndex)} " +
+            "usbRate=${MouseConfigService.rateLabel(cfg.usbRateIndex)} " +
+            "dpi=${cfg.dpiStages.joinToString()}",
+    )
     println("raw=${cfg.raw}")
     println("error=${cfg.error}")
 }

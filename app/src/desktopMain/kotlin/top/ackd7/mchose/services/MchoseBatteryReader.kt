@@ -4,22 +4,22 @@ import top.ackd7.mchose.interop.HidDeviceInfo
 import top.ackd7.mchose.interop.HidNative
 
 /**
- * 迈从 A7 V2 Ultra+ 电量读取（本机实机逆向验证，对应原 C# MchoseBatteryReader）。
+ * 迈从 A7 V2 Ultra+ 电量读取（实机验证 + 核对官方 M HUB 协议）。
  *
  * HID 通道：VID 0x3837，UsagePage 0xFF01，65 字节 Feature。
- * 流程（必须严格按此顺序）：
- *   1. SET_FEATURE(reportId=0x11, ~0x03, 0xFF...) → bond 唤醒；固件回 interrupt-IN "e5 03"。
- *   2. SET_FEATURE(reportId=0x11, ~0x06, 0xFF...) → ost 查询；固件回 interrupt-IN "e5 06"。
- *   3. 收到 ACK 后 GET_FEATURE(0x11)，固件在两个 bank 间交替：
- *        XOR bank: 11 F9 ...  → payload = bytes[2..] XOR 0xFF
- *        PLAIN bank:11 06 ... → payload = bytes[2..] 原样
- *   解码后 payload：
- *     [0..1] VID = 37 38 (0x3837)
- *     [2..3] PID
- *     [4..7] 固件版本
- *     [8]    连接位（&7: 0=USB, 1=2.4G, 2=BT）
- *     [9]    电量百分比 0-100
- *     [10]   充电状态（0=放电, 1=充电）
+ * 流程：
+ *   1. SET_FEATURE(reportId=0x11, ~0x03, 0xFF...) → bond 唤醒；尽力消费 interrupt-IN ACK。
+ *   2. SET_FEATURE(reportId=0x11, ~0x06, 0xFF...) → ost 查询；轮询 GET_FEATURE（双 bank 交替）。
+ *   3. 连续两次一致采样确认（参考 Tensyd/mchose-battery 对 A7 V2 Ultra+ 的防抖策略），
+ *      减少刚唤醒时的偶发跳电；超时则回退采用单次有效样本。
+ *
+ * 解码后 payload（little-endian）：
+ *   [0..1] VID = 37 38 (0x3837)
+ *   [2..3] 内部 PID
+ *   [4..7] 固件版本
+ *   [8]    连接位（&7: 0/4=USB, 1=2.4G, 2=BT；&8: 无线在线标志 linked）
+ *   [9]    电量百分比 0–100
+ *   [10]   充电状态（0=放电, 1=充电中, 2=已充满）
  */
 class MchoseBatteryReader {
 
@@ -64,62 +64,109 @@ class MchoseBatteryReader {
     }
 
     private fun readOne(dev: HidDeviceInfo): BatteryInfo {
-        val r = BatteryInfo(updatedAt = System.currentTimeMillis())
+        val fallback = BatteryInfo(updatedAt = System.currentTimeMillis())
+        var firstValid: BatteryInfo? = null
+
         HidNative.HidSession(dev.path, maxOf(dev.inputReportLength, featureLen)).use { s ->
             for (cycle in 0 until 3) {
                 if (cycle > 0) Thread.sleep(150)
 
                 s.flush(20)
 
-                // 1) bond 唤醒。ACK 尽力消费但不作为硬条件：
-                //    A7 V2 Ultra+ 只对 bond 回 ACK，部分固件干脆不回。
+                // 1) bond 唤醒（ACK 尽力消费但不作为硬条件）
                 send(s, cmdBond)
                 Thread.sleep(120)
-                waitAck(s, cmdBond, 600)
+                waitAck(s, cmdBond, 500)
 
-                // 2) ost 查询。实机验证：A7 V2 Ultra+ 对 ost 不产生中断-IN ACK，
-                //    因此不能等 ACK，改为发完立即轮询 GET_FEATURE（两 bank 交替返回）。
-                send(s, cmdOst)
-
-                for (k in 0 until 8) {
-                    Thread.sleep(80)
-                    waitAck(s, cmdOst, 20) // 若固件确实发了 ACK，顺手消费掉
-
-                    val payload = getPayload(s) ?: continue
-                    r.raw = hex(payload, 16)
-                    val vid = (payload[0].toInt() and 0xFF) or ((payload[1].toInt() and 0xFF) shl 8)
-                    val flags = payload[8].toInt() and 0xFF
-                    val level = payload[9].toInt() and 0xFF
-                    val charge = payload[10].toInt() and 0xFF
-
-                    if (vid == MchoseVid && level in 1..100) {
-                        r.percent = level
-                        r.charging = charge != 0
-                        r.mode = when (flags and 7) {
-                            0, 4 -> ConnectionMode.Usb // 有线；A7 V2 Ultra+ 有线实测 flags&7 = 4
-                            1 -> ConnectionMode.Radio24G
-                            2 -> ConnectionMode.Bluetooth
-                            else -> ConnectionMode.Unknown
-                        }
-                        r.deviceName = if (dev.productName.isBlank())
-                            "MCHOSE ${dev.vendorId.toString(16).uppercase()}:${dev.productId.toString(16).uppercase()}"
-                        else dev.productName
-                        r.vendorId = dev.vendorId.toString(16).uppercase().padStart(4, '0')
-                        r.productId = dev.productId.toString(16).uppercase().padStart(4, '0')
-                        r.lastPath = dev.path
-                        r.success = true
-                        r.error = ""
-                        return r
+                // 2) 最多发两轮 ost 查询，连续两次一致采样直接确认（防唤醒首帧抖动）
+                for (sampleRound in 0 until 2) {
+                    send(s, cmdOst)
+                    val sample = pollOstPayload(s, dev, fallback) ?: break
+                    val prev = firstValid
+                    if (prev != null && prev.rawPercent == sample.rawPercent && prev.chargeState == sample.chargeState) {
+                        return sample
                     }
+                    firstValid = sample
+                    // 若已拿到第一个有效样本，间隔 80ms 再确认一次
+                    if (sampleRound == 0) Thread.sleep(80)
+                }
+
+                // 若单轮里只成功拿到一个样本，下一轮继续尝试确认；最后一轮直接采用
+                if (firstValid != null && cycle >= 1) {
+                    return firstValid
                 }
             }
-            if (r.error.isBlank()) {
-                r.error = if (r.raw.isBlank())
-                    "未读到 feature 报告（设备可能深度休眠，轻动鼠标后重试）"
-                else "数据无效 raw=${r.raw}"
+        }
+
+        if (firstValid != null) return firstValid
+
+        if (fallback.error.isBlank()) {
+            fallback.error = if (fallback.raw.isBlank()) {
+                "未读到 feature 报告（设备可能深度休眠，轻动鼠标后重试）"
+            } else {
+                "设备休眠或数据无效 raw=${fallback.raw}"
             }
         }
-        return r
+        return fallback
+    }
+
+    private fun pollOstPayload(
+        s: HidNative.HidSession,
+        dev: HidDeviceInfo,
+        fallback: BatteryInfo,
+    ): BatteryInfo? {
+        for (k in 0 until 8) {
+            Thread.sleep(75)
+            waitAck(s, cmdOst, 20)
+
+            val payload = getPayload(s) ?: continue
+            fallback.raw = hex(payload, 16)
+            val vid = (payload[0].toInt() and 0xFF) or ((payload[1].toInt() and 0xFF) shl 8)
+            val flags = payload[8].toInt() and 0xFF
+            val level = payload[9].toInt() and 0xFF
+            val chargeRaw = payload[10].toInt() and 0xFF
+
+            val mode = when (flags and 7) {
+                0, 4 -> ConnectionMode.Usb
+                1 -> ConnectionMode.Radio24G
+                2 -> ConnectionMode.Bluetooth
+                else -> ConnectionMode.Unknown
+            }
+            val linked = (flags and 0x08) != 0
+
+            // 2.4G 模式下若无线在线位 linked == 0，说明鼠标离线/休眠，不采信接收器缓存数据
+            if (mode == ConnectionMode.Radio24G && !linked) {
+                fallback.error = "鼠标离线或休眠中（linked=0）"
+                continue
+            }
+
+            if (vid == MchoseVid && level in 1..100) {
+                val chargeState = when (chargeRaw) {
+                    1 -> ChargeState.Charging
+                    2 -> ChargeState.Full
+                    else -> ChargeState.Discharging
+                }
+                return BatteryInfo(
+                    success = true,
+                    percent = level,
+                    rawPercent = level,
+                    chargeState = chargeState,
+                    mode = mode,
+                    linked = linked,
+                    deviceName = if (dev.productName.isBlank()) {
+                        "MCHOSE ${dev.vendorId.toString(16).uppercase()}:${dev.productId.toString(16).uppercase()}"
+                    } else {
+                        dev.productName
+                    },
+                    vendorId = dev.vendorId.toString(16).uppercase().padStart(4, '0'),
+                    productId = dev.productId.toString(16).uppercase().padStart(4, '0'),
+                    raw = hex(payload, 16),
+                    updatedAt = System.currentTimeMillis(),
+                    lastPath = dev.path,
+                )
+            }
+        }
+        return null
     }
 
     private fun send(s: HidNative.HidSession, cmd: Byte) {

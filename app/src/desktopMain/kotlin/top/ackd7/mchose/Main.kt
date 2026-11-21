@@ -62,6 +62,7 @@ import top.ackd7.mchose.services.AppSettings
 import top.ackd7.mchose.services.Autostart
 import top.ackd7.mchose.services.BatteryInfo
 import top.ackd7.mchose.services.BatteryMonitor
+import top.ackd7.mchose.services.ChargeState
 import top.ackd7.mchose.services.NativeTrayIcon
 import top.ackd7.mchose.services.SingleInstance
 import top.ackd7.mchose.services.UpdateChecker
@@ -76,7 +77,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.0.0"
+const val APP_VERSION = "4.1.0"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -213,15 +214,20 @@ fun main(args: Array<String>) {
             javax.swing.SwingUtilities.invokeLater {
                 val hasReading = info.success && info.percent >= 0
                 val tip = if (hasReading) {
-                    APP_NAME + "  ${info.percent}%" +
-                        (if (info.stale) "（休眠，上次读数）" else if (info.charging) "  充电中" else "  放电中")
+                    val stateText = when {
+                        info.stale -> "（休眠，上次读数）"
+                        info.isFull -> "  已充满"
+                        info.charging -> "  充电中"
+                        else -> "  放电中"
+                    }
+                    "$APP_NAME  ${info.percent}%$stateText"
                 } else {
                     "$APP_NAME（休眠 / 未连接）"
                 }
                 if (settings.showPercentInTray && hasReading && !info.stale) {
                     t.setIcon(info.percent, info.charging, tip)
                 } else {
-                    // 休眠、未连接或关闭电量数字显示时展示透明 Zzz 胶囊
+                    // 休眠、未连接或关闭电量数字显示时展示透明 Zzz 图标
                     t.setIcon(null, false, tip)
                 }
             }
@@ -279,21 +285,21 @@ fun main(args: Array<String>) {
             // 低电量提醒：降到阈值提醒一次，电量回升（阈值 +5）后重新待命
             var alertArmed = true
             monitor.onReadingChanged = { info ->
-                // 设备休眠时固件会返回全 0；此时保留上一次成功读数的快照，避免界面突然变 "--"
+                // 设备休眠时固件会返回全 0 或 linked=0；此时保留上一次成功读数的快照，避免界面突然变 "--"
                 val effective = if (info.success) {
                     val snapshot = info.copy()
                     lastGood = snapshot
                     snapshot
                 } else {
-                    lastGood?.copy(stale = true, error = info.error, charging = false) ?: info.copy()
+                    lastGood?.copy(stale = true, error = info.error, chargeState = ChargeState.Discharging) ?: info.copy()
                 }
-                val brief = "ok=${info.success} stale=${effective.stale} pct=${effective.percent} err=${info.error}"
+                val brief = "ok=${info.success} stale=${effective.stale} pct=${effective.percent} rawPct=${effective.rawPercent} chg=${effective.chargeState} err=${info.error}"
                 if (brief != lastLogged) {
                     lastLogged = brief
                     appLog("读数: $brief")
                 }
-                // 低电量提醒（仅在非休眠且未充电时触发）
-                if (settings.lowBatteryAlert && effective.success && !effective.stale && !effective.charging) {
+                // 低电量提醒（仅在非休眠且放电状态下触发）
+                if (settings.lowBatteryAlert && effective.success && !effective.stale && !effective.charging && !effective.isFull) {
                     val threshold = settings.alertThreshold
                     if (effective.percent in 0..100) {
                         if (effective.percent <= threshold && alertArmed) {
@@ -607,7 +613,7 @@ private fun AppTitleBar(
     val sleeping = battery.stale || !battery.success
     val pillColor = when {
         sleeping -> Color(0xFF64748B)
-        battery.charging -> c.success
+        battery.charging || battery.isFull -> c.success
         battery.percent >= 50 -> c.accent
         battery.percent >= 20 -> c.warning
         else -> c.danger
@@ -615,6 +621,7 @@ private fun AppTitleBar(
     val pillText = when {
         sleeping && ok -> "${battery.percent}% · Zzz"
         sleeping -> "休眠 Zzz"
+        battery.isFull -> "${battery.percent}% · 已充满"
         battery.charging -> "${battery.percent}% · 充电中"
         else -> "${battery.percent}%"
     }
@@ -826,6 +833,7 @@ private fun TrayMenu(
     val statusSummary = when {
         sleeping && ok -> "电量 ${battery.percent}% · 休眠中"
         sleeping -> "设备休眠 / 未连接"
+        battery.isFull -> "电量 ${battery.percent}% · 已充满"
         battery.charging -> "电量 ${battery.percent}% · 充电中"
         else -> "电量 ${battery.percent}% · 放电中"
     }

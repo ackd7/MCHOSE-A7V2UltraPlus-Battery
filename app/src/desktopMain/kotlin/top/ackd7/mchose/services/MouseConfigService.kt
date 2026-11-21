@@ -97,13 +97,16 @@ class MouseConfigService {
 
     private fun parse(p: ByteArray, r: MouseConfig) {
         if (p.size < 18) return
-        val usbRate = p[1].toInt() and 0x0F
-        val usbDpi = (p[1].toInt() shr 4) and 0x0F
-        val gRate = p[2].toInt() and 0x0F
-        val gDpi = (p[2].toInt() shr 4) and 0x0F
-        r.usbRateIndex = clampIndex(usbRate)
+        // 实机验证（及 LORQAQ/mchose-tray 实验 A/B/C）：
+        // byte[1]: 低 4 位 = 无线 DPI 档位, 高 4 位 = 无线回报率档位
+        // byte[2]: 低 4 位 = 有线 DPI 档位, 高 4 位 = 有线回报率档位
+        val gDpi = p[1].toInt() and 0x0F
+        val gRate = (p[1].toInt() shr 4) and 0x0F
+        val usbDpi = p[2].toInt() and 0x0F
+        val usbRate = (p[2].toInt() shr 4) and 0x0F
         r.wirelessRateIndex = clampIndex(gRate)
-        r.activeDpiIndex = if (clampIndex(usbDpi) >= 0) usbDpi else (if (clampIndex(gDpi) >= 0) gDpi else -1)
+        r.usbRateIndex = clampIndex(usbRate)
+        r.activeDpiIndex = if (clampIndex(gDpi) >= 0) gDpi else clampIndex(usbDpi)
 
         for (i in 0 until 6) {
             val v = (p[4 + i * 2].toInt() and 0xFF) or ((p[5 + i * 2].toInt() and 0xFF) shl 8)

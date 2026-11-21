@@ -317,7 +317,7 @@ private fun BatteryHeroCard(
     val targetTone = when {
         !ok -> c.secondary
         battery.stale -> Color(0xFF64748B)
-        battery.charging -> c.success
+        battery.charging || battery.isFull -> c.success
         battery.percent >= 50 -> c.accent
         battery.percent >= 20 -> c.warning
         else -> c.danger
@@ -374,6 +374,7 @@ private fun BatteryHeroCard(
                 MochiStatusPill(
                     text = when {
                         sleeping -> "休眠中 Zzz"
+                        battery.isFull -> "已充满"
                         battery.charging -> "充电中"
                         else -> "放电中"
                     },
@@ -404,14 +405,24 @@ private fun BatteryHeroCard(
                     )
                 }
 
-                if (battery.stale && ok) {
-                    Text(
-                        text = "保留 ${formatTime(battery.updatedAt)} 的读数 · 轻动鼠标刷新",
-                        fontSize = 11.5.sp,
-                        color = c.secondary,
-                    )
-                } else {
-                    Spacer(Modifier.height(4.dp))
+                when {
+                    battery.stale && ok -> {
+                        Text(
+                            text = "保留 ${formatTime(battery.updatedAt)} 的读数 · 轻动鼠标刷新",
+                            fontSize = 11.5.sp,
+                            color = c.secondary,
+                        )
+                    }
+                    battery.smoothed && battery.charging -> {
+                        Text(
+                            text = "充电电压平滑中 · 固件原始值 ${battery.rawPercent}%",
+                            fontSize = 11.5.sp,
+                            color = c.secondary,
+                        )
+                    }
+                    else -> {
+                        Spacer(Modifier.height(4.dp))
+                    }
                 }
 
                 Spacer(Modifier.height(18.dp))
@@ -437,6 +448,7 @@ private fun BatteryHeroCard(
                     label = "电源状态",
                     value = when {
                         sleeping -> "休眠中"
+                        battery.isFull -> "已充满"
                         battery.charging -> "充电中"
                         else -> "正常放电"
                     },
@@ -657,13 +669,23 @@ class MouseConfigUiState(
             if (cfg.success) {
                 for (i in 0 until 6) dpiText[i] = cfg.dpiStages[i].toString()
                 if (cfg.activeDpiIndex in 0..5) activeDpiIndex = cfg.activeDpiIndex
+                val readRate = when {
+                    cfg.wirelessRateIndex in MouseConfigService.RateHz.indices -> cfg.wirelessRateIndex
+                    cfg.usbRateIndex in MouseConfigService.RateHz.indices -> cfg.usbRateIndex
+                    else -> -1
+                }
+                if (readRate >= 0) {
+                    rateIndex = readRate
+                    settings.rateHz = MouseConfigService.RateHz[readRate]
+                }
                 settings.dpiStages = IntArray(6) { cfg.dpiStages[it] }
                 settings.activeDpiIndex = activeDpiIndex
                 settings.save()
                 loaded = true
                 customDpi = false
                 statusIsError = false
-                status = "已同步鼠标配置 · 当前为档位 ${activeDpiIndex + 1}"
+                val rateDesc = if (readRate >= 0) " · ${MouseConfigService.RateHz[readRate]} Hz" else ""
+                status = "已同步鼠标配置 · 档位 ${activeDpiIndex + 1}$rateDesc"
             } else {
                 statusIsError = true
                 status = if (cfg.raw.startsWith("00 00")) {
@@ -746,7 +768,7 @@ private fun MousePage(state: MouseConfigUiState, wide: Boolean) {
         ) {
             MochiRow(
                 title = "重新读取鼠标配置",
-                subtitle = "从板载内存同步 6 档 DPI 与当前激活档",
+                subtitle = "从板载内存同步 6 档 DPI、当前档位与回报率",
                 chevron = true,
                 divider = false,
                 enabled = !state.busy,
@@ -935,7 +957,7 @@ private fun MousePage(state: MouseConfigUiState, wide: Boolean) {
     val rateSection: @Composable () -> Unit = {
         MochiSection(
             header = "回报率（Polling Rate）",
-            footer = "该型号配置报告不含回报率回读字段，界面保留本地写入记录；写入后掉电不丢。",
+            footer = "支持启动自动回读当前回报率，写入后掉电不丢（有线与 2.4G 同步生效）。",
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 val rates = MouseConfigService.RateHz
@@ -1433,6 +1455,11 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "4.1.0" to listOf(
+        "新增充电电压虚高平滑滤波，解决插电瞬间电量从 87% 暴涨到 100% 的假满电问题，并透明显示固件原始值",
+        "融合开源社区协议成果：双采样防抖确认、无线在线标志位校验、区分「充电中 / 已充满」、监听 Report 0x13 主动推送",
+        "修复 12 67 全量配置报告高低半字节解析反转，正式支持启动自动回读真实回报率",
+    ),
     "4.0.0" to listOf(
         "全新纯色超椭圆 UI（参考 miuix × mochi-compose）：G2 连续圆角、3×2 可视化 DPI 与回报率矩阵、分段外观与刷新切换",
         "全新扁平化无线鼠标应用图标，安装包显式绑定独立图标并自动刷新 Windows 桌面图标缓存",
