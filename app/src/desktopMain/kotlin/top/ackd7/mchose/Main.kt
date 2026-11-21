@@ -55,7 +55,7 @@ import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.2.2"
+const val APP_VERSION = "3.2.3"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -153,10 +153,24 @@ fun main(args: Array<String>) {
             }
         }
 
+        // 横向窗口；--narrow 为开发用（验证窄屏单列布局）
+        val windowState = rememberWindowState(
+            size = if (args.contains("--narrow")) DpSize(460.dp, 700.dp)
+            else DpSize(880.dp, 560.dp),
+        )
+        val menuState = rememberWindowState(size = DpSize(180.dp, 148.dp))
+
         fun openMainWindow() {
             menuVisible = false
             isVisible = true
             showToken++
+        }
+
+        fun hideMainWindow() {
+            menuVisible = false
+            windowState.isMinimized = false
+            isVisible = false
+            appLog("窗口已隐藏到托盘")
         }
 
         fun shutdownApp() {
@@ -165,13 +179,6 @@ fun main(args: Array<String>) {
             monitor.stop()
             javax.swing.SwingUtilities.invokeLater { exitApplication() }
         }
-
-        // 横向窗口；--narrow 为开发用（验证窄屏单列布局）
-        val windowState = rememberWindowState(
-            size = if (args.contains("--narrow")) DpSize(460.dp, 700.dp)
-            else DpSize(880.dp, 560.dp),
-        )
-        val menuState = rememberWindowState(size = DpSize(180.dp, 148.dp))
 
         // 所有副作用只做一次
         LaunchedEffect(Unit) {
@@ -252,10 +259,11 @@ fun main(args: Array<String>) {
         }
 
         Window(
-            onCloseRequest = { isVisible = false },
+            onCloseRequest = { hideMainWindow() },
             title = APP_NAME,
             state = windowState,
             undecorated = true,
+            visible = isVisible,
         ) {
             val win = window
             var isMax by remember { mutableStateOf(false) }
@@ -282,25 +290,23 @@ fun main(args: Array<String>) {
                 })
             }
 
-            // 显隐：只在这里改 AWT 状态，避免 Compose 的 visible 参数与手动操作互相打架
+            // 窗口重新显示时确保 Win11 圆角已生效（静默启动首次展示时 HWND 才真正映射）
             LaunchedEffect(isVisible) {
                 if (isVisible) {
-                    win.isVisible = true
-                } else {
-                    win.isVisible = false
-                    appLog("窗口已隐藏")
+                    runCatching { applyRoundedCorners(win) }
                 }
             }
 
-            // 从托盘打开时强制恢复（含取消最小化 / 置前 / 抢焦点）
+            // 从托盘打开时强制恢复（含取消最小化 / Win32 还原置前 / 抢焦点）
             LaunchedEffect(showToken) {
                 if (showToken == 0) return@LaunchedEffect
-                win.isMinimized = false
-                ensureOnScreen(win)
-                win.isVisible = true
-                win.toFront()
-                win.requestFocus()
-                appLog("托盘恢复窗口 #$showToken（minimized=${win.isMinimized}, visible=${win.isVisible}）")
+                val wasIconified = windowState.isMinimized ||
+                    (win.extendedState and java.awt.Frame.ICONIFIED) != 0
+                windowState.isMinimized = false
+                javax.swing.SwingUtilities.invokeLater {
+                    restoreAndFocusWindow(win, wasIconified)
+                    appLog("托盘恢复窗口 #$showToken（wasIconified=$wasIconified, state=${win.extendedState}, visible=${win.isVisible}）")
+                }
             }
 
             App(
@@ -318,9 +324,9 @@ fun main(args: Array<String>) {
                         subtitle = "v$APP_VERSION",
                         isMaximized = isMax,
                         onMinimize = {
-                            // 真正最小化：任务栏保留按钮；托盘「打开面板」会强制还原
+                            // 通过 windowState 最小化，保证 Compose 状态与底层窗口同步
                             appLog("点击最小化 → 最小化到任务栏")
-                            win.isMinimized = true
+                            windowState.isMinimized = true
                         },
                         onToggleMaximize = {
                             // 必须以窗口真实状态为依据，不能用自己维护的布尔值（会与系统状态错位）
@@ -333,7 +339,7 @@ fun main(args: Array<String>) {
                         },
                         onClose = {
                             appLog("点击关闭 → 隐藏窗口")
-                            isVisible = false
+                            hideMainWindow()
                         },
                     )
                 },
@@ -605,6 +611,31 @@ private fun ensureOnScreen(w: java.awt.Window) {
             p.y + (p.height - w.height) / 2,
         )
     }
+}
+
+/** 从隐藏/最小化状态强制还原并置前激活窗口（AWT + Win32 双保险）。 */
+private fun restoreAndFocusWindow(win: java.awt.Frame, wasIconified: Boolean) {
+    runCatching {
+        val iconified = wasIconified || (win.extendedState and java.awt.Frame.ICONIFIED) != 0
+        win.extendedState = win.extendedState and java.awt.Frame.ICONIFIED.inv()
+        ensureOnScreen(win)
+        if (!win.isVisible) win.isVisible = true
+
+        val ptr = com.sun.jna.Native.getWindowPointer(win)
+        if (ptr != null) {
+            val hwnd = com.sun.jna.platform.win32.WinDef.HWND(ptr)
+            val user32 = com.sun.jna.platform.win32.User32.INSTANCE
+            // SW_RESTORE(9) 还原最小化窗口；SW_SHOW(5) 保持最大化/正常尺寸不变
+            user32.ShowWindow(hwnd, if (iconified) 9 else 5)
+            user32.SetForegroundWindow(hwnd)
+        }
+
+        // 临时置顶脉冲，确保窗口从其他应用后面浮出并获取焦点
+        win.isAlwaysOnTop = true
+        win.toFront()
+        win.requestFocus()
+        win.isAlwaysOnTop = false
+    }.onFailure { appLog("拉起窗口异常: ${it.message}") }
 }
 
 /** 给无边框窗口加 Windows 11 圆角（失败不影响功能）。 */

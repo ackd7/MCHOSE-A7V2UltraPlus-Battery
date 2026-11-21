@@ -3,6 +3,18 @@
 本文件用于生成 GitHub Release 的「更新内容」段落。发布新版本时，在顶部新增一节，
 标题格式为 `## vX.Y.Z`，CI 会按版本号自动截取对应小节。
 
+## v3.2.3
+
+### 修复
+- **开机自启静默启动失效**：此前主窗口未将 `visible = isVisible` 交给 Compose `Window` 统一管理，导致带 `--minimized` 参数开机自启时仍会弹出主界面。现已修复为真正静默启动，仅在任务栏托盘常驻，不弹出窗口。
+- **点击关闭按钮无法隐藏窗口**：静默启动场景下 `isVisible` 初始为 `false`，导致点击关闭按钮再次置 `false` 不触发隐藏。统一由 `Window(visible = isVisible)` 管理显隐后彻底修复。
+- **最小化后无法通过托盘小图标拉起**：
+  - 托盘图标点击事件由 `mouseClicked` 改为 `mouseReleased`（并兼容 `ActionListener`），解决 Windows 托盘点击轻微移动丢事件的问题；
+  - 恢复窗口时同步 `windowState.isMinimized = false`，并结合 Win32 `ShowWindow(SW_RESTORE)`、`SetForegroundWindow` 与临时置顶脉冲，确保最小化或被遮挡的窗口都能一键拉起置前。
+
+### 文档
+- 项目主页 `README.md` 更新为**简体中文 / English** 双语说明。
+
 ## v3.2.2
 
 ### 修复

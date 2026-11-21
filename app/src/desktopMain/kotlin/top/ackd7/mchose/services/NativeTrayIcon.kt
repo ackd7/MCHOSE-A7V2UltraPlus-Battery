@@ -37,14 +37,25 @@ class NativeTrayIcon : AutoCloseable {
         trayIcon.isImageAutoSize = true
         trayIcon.toolTip = top.ackd7.mchose.APP_NAME
 
+        var lastOpenAt = 0L
+        fun triggerOpen() {
+            val now = System.currentTimeMillis()
+            if (now - lastOpenAt < 180L) return
+            lastOpenAt = now
+            onOpen?.invoke()
+        }
+
+        // 用 mouseReleased 替代 mouseClicked：Windows 托盘图标点击稍有抖动就会丢弃 mouseClicked
         trayIcon.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
+            override fun mouseReleased(e: MouseEvent) {
                 when (e.button) {
-                    MouseEvent.BUTTON1 -> onOpen?.invoke()
+                    MouseEvent.BUTTON1 -> triggerOpen()
                     MouseEvent.BUTTON3 -> onMenu?.invoke()
                 }
             }
         })
+        // 兼容双击或键盘激活托盘图标
+        trayIcon.addActionListener { triggerOpen() }
 
         SystemTray.getSystemTray().add(trayIcon)
     }
