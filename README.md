@@ -43,8 +43,8 @@
 
 - 纯色 **G2 连续超椭圆**卡片设计，横向自适应窗口（宽屏两列 / 窄屏单列）
 - **浅色 / 深色 / 跟随系统**三段胶囊外观切换，主窗口与托盘右键菜单同步即时生效
-- 完整的**打开 / 缩小 / 放大（不遮挡任务栏）/ 关闭**窗口过渡动画，配合弹簧按压与滑动切页动效
-- 无边框融入式标题栏：带应用图标与实时电量微胶囊，支持拖动、双击放大与 Windows 11 圆角
+- 弹簧按压反馈、滑动切页与平滑电量数字过渡动效
+- 极简无边框融入式标题栏：带应用图标、实时电量微胶囊与单个关闭按钮（隐藏到托盘），支持拖动与 Windows 11 原生圆角
 
 ### 支持设备
 
@@ -100,10 +100,10 @@ DPI / 回报率（同一协议族的厂商命令）：
 .\gradlew.bat :app:compileKotlinDesktop
 
 # 打包 MSI（产物：app/build/compose/binaries/main/msi/）
-.\gradlew.bat :app:packageMsi -PappVersion=4.1.3
+.\gradlew.bat :app:packageMsi -PappVersion=4.1.4
 
 # 打中文安装向导（需先装 NSIS，产物：dist/）
-makensis /DAPP_VERSION=4.1.3 /DPRODUCT_VERSION=4.1.3 installer/setup.nsi
+makensis /DAPP_VERSION=4.1.4 /DPRODUCT_VERSION=4.1.4 installer/setup.nsi
 
 # 硬件自检（枚举设备、读电量、读配置）
 .\gradlew.bat :app:diag
@@ -182,8 +182,8 @@ Rewritten in **Kotlin + Compose Multiplatform** (migrated from WPF in v2.0), ins
 
 - Pure solid-color **G2 continuous squircle** cards with responsive horizontal layout (two-column on wide windows, single-column when narrow)
 - **Light / Dark / Follow System** themes applied instantly to both the main window and the custom tray context menu
-- Smooth **open / minimize / maximize (respecting taskbar work area) / close** window animations, plus spring press feedback and horizontal page transitions
-- Borderless window with custom title bar controls, live battery pill, drag-to-move, double-click to maximize, and Windows 11 rounded corners
+- Spring press feedback, smooth horizontal page transitions, and animated battery gauge
+- Minimal borderless title bar with live battery pill, drag-to-move, single close-to-tray button, and native Windows 11 rounded corners
 
 ### Supported Device
 
@@ -239,10 +239,10 @@ Requires **JDK 21** (`gradlew` downloads Gradle 9.x automatically).
 .\gradlew.bat :app:compileKotlinDesktop
 
 # Build MSI package (output: app/build/compose/binaries/main/msi/)
-.\gradlew.bat :app:packageMsi -PappVersion=4.1.3
+.\gradlew.bat :app:packageMsi -PappVersion=4.1.4
 
 # Build NSIS Setup installer (requires NSIS, output: dist/)
-makensis /DAPP_VERSION=4.1.3 /DPRODUCT_VERSION=4.1.3 installer/setup.nsi
+makensis /DAPP_VERSION=4.1.4 /DPRODUCT_VERSION=4.1.4 installer/setup.nsi
 
 # Run hardware diagnostics (enumerate HID devices, read battery & config)
 .\gradlew.bat :app:diag

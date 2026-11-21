@@ -1,20 +1,15 @@
 package top.ackd7.mchose
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,24 +26,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -57,8 +45,6 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.ackd7.mchose.services.AppSettings
 import top.ackd7.mchose.services.Autostart
@@ -79,7 +65,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.1.3"
+const val APP_VERSION = "4.1.4"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -342,214 +328,9 @@ fun main(args: Array<String>) {
             title = APP_NAME,
             state = windowState,
             undecorated = true,
-            transparent = true,
             visible = isVisible,
         ) {
             val win = window
-            val uiScope = rememberCoroutineScope()
-            val density = LocalDensity.current.density
-            var isMax by remember { mutableStateOf(false) }
-            var normalBounds by remember { mutableStateOf<java.awt.Rectangle?>(null) }
-
-            val isDarkWin = when (themeMode) {
-                "light" -> false
-                "dark" -> true
-                else -> isSystemInDarkTheme()
-            }
-            val winCanvasBg = if (isDarkWin) Color(0xFF0F1218) else Color(0xFFF2F5FA)
-
-            // 100% 纯 GPU 透明画布窗口动效：
-            // - 关闭/缩小：零 setBounds / 零 setLocation / 零 setOpacity，整块圆角窗口直接被任务栏/托盘吸收，4K 高刷满帧不卡
-            // - 放大/还原：仅 1 次透明画布尺寸切换 + 像素精确锚定的整体拉伸/缩放，背景与全部卡片同步平滑扩大或收回
-            var winScaleX by remember { mutableFloatStateOf(1f) }
-            var winScaleY by remember { mutableFloatStateOf(1f) }
-            var winAlpha by remember { mutableFloatStateOf(1f) }
-            var winOffsetX by remember { mutableFloatStateOf(0f) }
-            var winOffsetY by remember { mutableFloatStateOf(0f) }
-            var winOrigin by remember { mutableStateOf(TransformOrigin.Center) }
-            val animProgress = remember { Animatable(1f) }
-            var transitionJob by remember { mutableStateOf<Job?>(null) }
-            var lastHiddenToTray by remember { mutableStateOf(false) }
-            var exiting by remember { mutableStateOf(false) }
-            var morphing by remember { mutableStateOf(false) }
-
-            fun resetVisualState() {
-                winScaleX = 1f
-                winScaleY = 1f
-                winAlpha = 1f
-                winOffsetX = 0f
-                winOffsetY = 0f
-                winOrigin = TransformOrigin.Center
-            }
-
-            fun playEnterAnimation(fromTray: Boolean = false) {
-                transitionJob?.cancel()
-                exiting = false
-                morphing = false
-                transitionJob = uiScope.launch {
-                    val ease = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
-                    val startScaleX = if (fromTray) 0.70f else 0.76f
-                    val startScaleY = 0.68f
-                    val startOffX = if (fromTray) 36f * density else 0f
-                    val startOffY = 48f * density
-                    winOrigin = if (fromTray) TransformOrigin(0.92f, 1f) else TransformOrigin(0.5f, 1f)
-                    animProgress.snapTo(0f)
-                    winScaleX = startScaleX
-                    winScaleY = startScaleY
-                    winOffsetX = startOffX
-                    winOffsetY = startOffY
-                    winAlpha = 0f
-                    animProgress.animateTo(1f, tween(230, easing = ease)) {
-                        val t = value
-                        winScaleX = startScaleX + (1f - startScaleX) * t
-                        winScaleY = startScaleY + (1f - startScaleY) * t
-                        winOffsetX = startOffX * (1f - t)
-                        winOffsetY = startOffY * (1f - t)
-                        winAlpha = (t * 1.4f).coerceIn(0f, 1f)
-                    }
-                    resetVisualState()
-                }
-            }
-
-            fun playCloseAnimation() {
-                if (exiting || morphing) return
-                transitionJob?.cancel()
-                exiting = true
-                lastHiddenToTray = true
-                transitionJob = uiScope.launch {
-                    try {
-                        // 关闭 → 纯 GPU 锚定右下角托盘斜向吸入（零 Win32 阻塞调用，120Hz 满帧）
-                        val ease = CubicBezierEasing(0.36f, 0f, 0.72f, 1f)
-                        winOrigin = TransformOrigin(0.95f, 1f)
-                        animProgress.snapTo(0f)
-                        animProgress.animateTo(1f, tween(215, easing = ease)) {
-                            val t = value
-                            winScaleX = 1f - 0.86f * t
-                            winScaleY = 1f - 0.90f * t
-                            winOffsetX = 28f * density * t
-                            winOffsetY = 46f * density * t
-                            winAlpha = (1f - t * t).coerceIn(0f, 1f)
-                        }
-                        win.isVisible = false
-                        hideMainWindow()
-                        resetVisualState()
-                    } finally {
-                        exiting = false
-                    }
-                }
-            }
-
-            fun playMinimizeAnimation() {
-                if (exiting || morphing) return
-                transitionJob?.cancel()
-                exiting = true
-                lastHiddenToTray = false
-                transitionJob = uiScope.launch {
-                    try {
-                        // 缩小 → 纯 GPU 锚定底部任务栏中点漏斗式吸入（零 Win32 阻塞调用，120Hz 满帧）
-                        val ease = CubicBezierEasing(0.36f, 0f, 0.72f, 1f)
-                        winOrigin = TransformOrigin(0.5f, 1f)
-                        animProgress.snapTo(0f)
-                        animProgress.animateTo(1f, tween(215, easing = ease)) {
-                            val t = value
-                            winScaleX = 1f - 0.82f * t
-                            winScaleY = 1f - 0.90f * t
-                            winOffsetX = 0f
-                            winOffsetY = 46f * density * t
-                            winAlpha = (1f - t * t).coerceIn(0f, 1f)
-                        }
-                        windowState.isMinimized = true
-                    } finally {
-                        exiting = false
-                    }
-                }
-            }
-
-            fun toggleMaximizeAnimated() {
-                if (exiting || morphing) return
-                if (!isMax) {
-                    val current = java.awt.Rectangle(win.bounds)
-                    normalBounds = current
-                    val target = currentScreenWorkArea(win)
-                    val sx = (current.width.toFloat() / target.width.coerceAtLeast(1)).coerceIn(0.15f, 1f)
-                    val sy = (current.height.toFloat() / target.height.coerceAtLeast(1)).coerceIn(0.15f, 1f)
-                    val tx = (current.x - target.x) * density
-                    val ty = (current.y - target.y) * density
-                    isMax = true
-                    morphing = true
-                    appLog("切换最大化：普通 -> 放大工作区 $target")
-                    // 先将透明画布内的整块窗口锚定到原位置尺寸，再单次扩大画布，实现背景与所有卡片同步平滑拉伸
-                    winOrigin = TransformOrigin(0f, 0f)
-                    winScaleX = sx
-                    winScaleY = sy
-                    winOffsetX = tx
-                    winOffsetY = ty
-                    winAlpha = 1f
-                    win.setBounds(target)
-                    transitionJob?.cancel()
-                    transitionJob = uiScope.launch {
-                        try {
-                            val ease = CubicBezierEasing(0.18f, 0.96f, 0.24f, 1f)
-                            animProgress.snapTo(0f)
-                            animProgress.animateTo(1f, tween(250, easing = ease)) {
-                                val t = value
-                                winScaleX = sx + (1f - sx) * t
-                                winScaleY = sy + (1f - sy) * t
-                                winOffsetX = tx * (1f - t)
-                                winOffsetY = ty * (1f - t)
-                            }
-                            resetVisualState()
-                        } finally {
-                            morphing = false
-                        }
-                    }
-                } else {
-                    val current = java.awt.Rectangle(win.bounds)
-                    val target = normalBounds ?: defaultCenteredBounds(win)
-                    val sx = (target.width.toFloat() / current.width.coerceAtLeast(1)).coerceIn(0.15f, 1f)
-                    val sy = (target.height.toFloat() / current.height.coerceAtLeast(1)).coerceIn(0.15f, 1f)
-                    val tx = (target.x - current.x) * density
-                    val ty = (target.y - current.y) * density
-                    morphing = true
-                    appLog("切换最大化：放大 -> 还原 $target")
-                    winOrigin = TransformOrigin(0f, 0f)
-                    transitionJob?.cancel()
-                    transitionJob = uiScope.launch {
-                        try {
-                            val ease = CubicBezierEasing(0.20f, 0.94f, 0.28f, 1f)
-                            animProgress.snapTo(0f)
-                            animProgress.animateTo(1f, tween(230, easing = ease)) {
-                                val t = value
-                                winScaleX = 1f + (sx - 1f) * t
-                                winScaleY = 1f + (sy - 1f) * t
-                                winOffsetX = tx * t
-                                winOffsetY = ty * t
-                            }
-                            // 缩小落点与 target 像素对齐后，单次切换回普通窗口尺寸并归零变换
-                            isMax = false
-                            resetVisualState()
-                            win.setBounds(target)
-                        } finally {
-                            morphing = false
-                        }
-                    }
-                }
-            }
-
-            fun unmaximizeForDrag(pointerScreenX: Int, pointerScreenY: Int) {
-                if (!isMax) return
-                transitionJob?.cancel()
-                morphing = false
-                resetVisualState()
-                val oldBounds = win.bounds
-                val restore = normalBounds ?: defaultCenteredBounds(win)
-                val ratioX = ((pointerScreenX - oldBounds.x).toDouble() / oldBounds.width.coerceAtLeast(1))
-                    .coerceIn(0.15, 0.85)
-                val nx = (pointerScreenX - restore.width * ratioX).toInt()
-                val ny = (pointerScreenY - 22).coerceAtLeast(currentScreenWorkArea(win).y)
-                isMax = false
-                win.setBounds(nx, ny, restore.width, restore.height)
-            }
 
             LaunchedEffect(Unit) {
                 runCatching {
@@ -559,31 +340,17 @@ fun main(args: Array<String>) {
                     }
                 }
                 runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
+                runCatching { applyRoundedCorners(win) }
                 runCatching { win.rootPane.border = null }
-
-                win.addWindowStateListener { e ->
-                    appLog("窗口状态变化: ${e.oldState} -> ${e.newState}（isMax=$isMax）")
-                }
-                win.addWindowListener(object : java.awt.event.WindowAdapter() {
-                    override fun windowIconified(e: java.awt.event.WindowEvent?) {
-                        appLog("窗口被最小化（iconified）")
-                    }
-
-                    override fun windowDeiconified(e: java.awt.event.WindowEvent?) {
-                        appLog("窗口已还原（deiconified）")
-                        javax.swing.SwingUtilities.invokeLater { playEnterAnimation(fromTray = false) }
-                    }
-                })
             }
 
-            // 首次显示（非托盘 showToken 触发）时播放丝滑弹出动画
             LaunchedEffect(isVisible) {
-                if (isVisible && showToken == 0) {
-                    playEnterAnimation(fromTray = false)
+                if (isVisible) {
+                    runCatching { applyRoundedCorners(win) }
                 }
             }
 
-            // 从托盘打开时强制恢复（含取消最小化 / Win32 还原置前 / 抢焦点 + 反向弹出动画）
+            // 从托盘打开时强制恢复（含取消最小化 / Win32 还原置前 / 抢焦点）
             LaunchedEffect(showToken) {
                 if (showToken == 0) return@LaunchedEffect
                 val wasIconified = windowState.isMinimized ||
@@ -591,66 +358,30 @@ fun main(args: Array<String>) {
                 windowState.isMinimized = false
                 javax.swing.SwingUtilities.invokeLater {
                     restoreAndFocusWindow(win, wasIconified)
-                    playEnterAnimation(fromTray = lastHiddenToTray && !wasIconified)
                     appLog("托盘恢复窗口 #$showToken（wasIconified=$wasIconified, state=${win.extendedState}, visible=${win.isVisible}）")
                 }
             }
 
-            val flushMaximized = isMax && !morphing
-            val winShape = G2RoundedShape(if (flushMaximized) 0.dp else 14.dp)
-            val winBorderColor = if (isDarkWin) Color.White.copy(alpha = 0.13f) else Color.Black.copy(alpha = 0.11f)
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            transformOrigin = winOrigin
-                            scaleX = winScaleX
-                            scaleY = winScaleY
-                            alpha = winAlpha
-                            translationX = winOffsetX
-                            translationY = winOffsetY
-                        }
-                        .clip(winShape)
-                        .background(winCanvasBg)
-                        .then(
-                            if (flushMaximized) Modifier
-                            else Modifier.border(1.dp, winBorderColor, winShape),
-                        ),
-                ) {
-                    App(
-                        settings = settings,
-                        monitor = monitor,
+            App(
+                settings = settings,
+                monitor = monitor,
+                battery = battery,
+                updateInfo = updateInfo,
+                themeMode = themeMode,
+                onThemeModeChange = { themeMode = it },
+                onShowPercentChange = { syncTrayIcon(battery) },
+                titleBar = {
+                    AppTitleBar(
+                        window = win,
+                        title = APP_NAME,
+                        subtitle = "v$APP_VERSION",
                         battery = battery,
-                        updateInfo = updateInfo,
-                        themeMode = themeMode,
-                        onThemeModeChange = { themeMode = it },
-                        onShowPercentChange = { syncTrayIcon(battery) },
-                        titleBar = {
-                            AppTitleBar(
-                                window = win,
-                                title = APP_NAME,
-                                subtitle = "v$APP_VERSION",
-                                battery = battery,
-                                isMaximized = isMax,
-                                onDragStartFromMaximized = { px, py -> unmaximizeForDrag(px, py) },
-                                onMinimize = {
-                                    appLog("点击最小化 → 任务栏吸收动画并最小化")
-                                    playMinimizeAnimation()
-                                },
-                                onToggleMaximize = { toggleMaximizeAnimated() },
-                                onClose = {
-                                    appLog("点击关闭 → 托盘吸收动画并隐藏到托盘")
-                                    playCloseAnimation()
-                                },
-                            )
-                        },
-                        onExitRequested = { shutdownApp() },
-                        initialPage = initialPage,
+                        onClose = { hideMainWindow() },
                     )
-                }
-            }
+                },
+                onExitRequested = { shutdownApp() },
+                initialPage = initialPage,
+            )
         }
 
         // 托盘右键菜单：常驻的 Compose 小窗口（只切 visible，避免销毁窗口导致应用退出）
@@ -713,10 +444,6 @@ private fun AppTitleBar(
     title: String,
     subtitle: String,
     battery: BatteryInfo,
-    isMaximized: Boolean,
-    onDragStartFromMaximized: (Int, Int) -> Unit,
-    onMinimize: () -> Unit,
-    onToggleMaximize: () -> Unit,
     onClose: () -> Unit,
 ) {
     val c = rememberMochiColors()
@@ -752,11 +479,7 @@ private fun AppTitleBar(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .dragWindow(
-                    window = window,
-                    onBeforeDrag = onDragStartFromMaximized,
-                    onDoubleClick = onToggleMaximize,
-                ),
+                .dragWindow(window = window),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (appIcon != null) {
@@ -793,17 +516,6 @@ private fun AppTitleBar(
             )
         }
 
-        WindowButton(onClick = onMinimize) { stroke ->
-            strokeLine(stroke, Offset(size.width * 0.15f, size.height / 2f), Offset(size.width * 0.85f, size.height / 2f), 1.6f)
-        }
-        WindowButton(onClick = onToggleMaximize) { stroke ->
-            if (isMaximized) {
-                drawRect(stroke, Offset(size.width * 0.08f, size.height * 0.3f), Size(size.width * 0.58f, size.height * 0.58f), style = Stroke(1.5f))
-                drawRect(stroke, Offset(size.width * 0.3f, size.height * 0.08f), Size(size.width * 0.58f, size.height * 0.58f), style = Stroke(1.5f))
-            } else {
-                drawRect(stroke, Offset(size.width * 0.15f, size.height * 0.15f), Size(size.width * 0.7f, size.height * 0.7f), style = Stroke(1.5f))
-            }
-        }
         WindowButton(onClick = onClose, isClose = true) { stroke ->
             strokeLine(stroke, Offset(size.width * 0.22f, size.height * 0.22f), Offset(size.width * 0.78f, size.height * 0.78f), 1.6f)
             strokeLine(stroke, Offset(size.width * 0.78f, size.height * 0.22f), Offset(size.width * 0.22f, size.height * 0.78f), 1.6f)
@@ -812,7 +524,7 @@ private fun AppTitleBar(
 }
 
 /**
- * 拖动标题栏移动窗口；双击标题栏切换最大化。
+ * 拖动标题栏移动窗口。
  *
  * 抖动原因：早期实现用「窗口位置 + 节点偏移 + 事件局部坐标」反推屏幕指针。
  * 事件里的局部坐标是按"事件产生时"的窗口位置算的，而我们处理时窗口可能已经移动，
@@ -824,12 +536,7 @@ private fun AppTitleBar(
  */
 private fun Modifier.dragWindow(
     window: java.awt.Window,
-    onBeforeDrag: (Int, Int) -> Unit,
-    onDoubleClick: () -> Unit,
 ): Modifier = this
-    .pointerInput(window) {
-        detectTapGestures(onDoubleTap = { onDoubleClick() })
-    }
     .pointerInput(window) {
         var startPointerX = 0
         var startPointerY = 0
@@ -840,7 +547,6 @@ private fun Modifier.dragWindow(
             onDragStart = {
                 val p = java.awt.MouseInfo.getPointerInfo()?.location
                 if (p != null) {
-                    onBeforeDrag(p.x, p.y)
                     startPointerX = p.x
                     startPointerY = p.y
                 }
@@ -859,27 +565,6 @@ private fun Modifier.dragWindow(
             },
         )
     }
-
-/** 获取窗口当前所在显示器的可用工作区（扣除 Windows 任务栏区域，放大时不遮挡任务栏）。 */
-private fun currentScreenWorkArea(window: java.awt.Window): java.awt.Rectangle {
-    val gc = window.graphicsConfiguration
-        ?: java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration
-    val b = gc.bounds
-    val insets = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(gc)
-    return java.awt.Rectangle(
-        b.x + insets.left,
-        b.y + insets.top,
-        (b.width - insets.left - insets.right).coerceAtLeast(620),
-        (b.height - insets.top - insets.bottom).coerceAtLeast(420),
-    )
-}
-
-private fun defaultCenteredBounds(window: java.awt.Window): java.awt.Rectangle {
-    val work = currentScreenWorkArea(window)
-    val w = 880.coerceAtMost(work.width)
-    val h = 560.coerceAtMost(work.height)
-    return java.awt.Rectangle(work.x + (work.width - w) / 2, work.y + (work.height - h) / 2, w, h)
-}
 
 /** 保证窗口至少有一块留在某个屏幕内。 */
 private fun clampToScreen(window: java.awt.Window, x: Int, y: Int): Pair<Int, Int> {
