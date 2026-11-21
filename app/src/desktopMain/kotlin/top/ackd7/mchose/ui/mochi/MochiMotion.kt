@@ -121,31 +121,26 @@ fun Modifier.mochiPressScale(
 }
 
 /**
- * Liquid Glass 液态玻璃卡片容器修饰符：
- * G2 超椭圆 + 柔和层次投影 + 卡片底色 + 上亮下微的双向高光折射边框。
+ * 纯色 G2 连续超椭圆卡片容器修饰符：
+ * G2 超椭圆 + 柔和克制投影 + 纯色卡片底色 + 均匀纯色发丝边框。
  */
 fun Modifier.mochiGlassSurface(
     colors: MochiColors,
     cornerRadius: Dp = 22.dp,
-    elevation: Dp = 10.dp,
+    elevation: Dp = 6.dp,
     backgroundColor: Color = colors.card,
 ): Modifier {
     val shape = G2RoundedShape(cornerRadius)
-    val rimBrush = Brush.verticalGradient(
-        0f to colors.glassBorderTop,
-        0.45f to colors.cardBorder,
-        1f to colors.glassBorderBottom,
-    )
     return this
         .shadow(
             elevation = elevation,
             shape = shape,
-            ambientColor = Color.Black.copy(alpha = if (colors.isDark) 0.28f else 0.06f),
-            spotColor = Color.Black.copy(alpha = if (colors.isDark) 0.36f else 0.09f),
+            ambientColor = Color.Black.copy(alpha = if (colors.isDark) 0.22f else 0.05f),
+            spotColor = Color.Black.copy(alpha = if (colors.isDark) 0.28f else 0.07f),
         )
         .clip(shape)
         .background(backgroundColor)
-        .border(1.dp, rimBrush, shape)
+        .border(1.dp, colors.cardBorder, shape)
 }
 
 /**
@@ -225,25 +220,21 @@ fun MochiSegmentedControl(
             label = "segmentThumb",
         )
 
-        // 悬浮液态滑块
+        // 悬浮滑块（纯色 + 均匀发丝边框）
         Box(
             modifier = Modifier
                 .offset(x = thumbOffset)
                 .width(segWidth)
                 .fillMaxHeight()
                 .shadow(
-                    elevation = if (c.isDark) 4.dp else 6.dp,
+                    elevation = if (c.isDark) 2.dp else 4.dp,
                     shape = thumbShape,
-                    ambientColor = Color.Black.copy(alpha = 0.12f),
-                    spotColor = Color.Black.copy(alpha = 0.14f),
+                    ambientColor = Color.Black.copy(alpha = 0.10f),
+                    spotColor = Color.Black.copy(alpha = 0.12f),
                 )
                 .clip(thumbShape)
                 .background(c.segmentThumb)
-                .border(
-                    1.dp,
-                    Brush.verticalGradient(listOf(c.glassBorderTop, c.cardBorder)),
-                    thumbShape,
-                ),
+                .border(1.dp, c.cardBorder, thumbShape),
         )
 
         Row(modifier = Modifier.fillMaxSize()) {

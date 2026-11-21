@@ -185,26 +185,26 @@ class NativeTrayIcon : AutoCloseable {
             g.stroke = BasicStroke(strokePx, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
             g.draw(frame)
 
-            // 内部可用净宽高（用于自适应拉满数字字号，绝不碰框）
-            val innerMargin = strokePx + (s * 0.07)
+            // 内部可用净宽高：留出充足的内边距呼吸感，避免数字贴近边框
+            val innerMargin = strokePx + (s * 0.145)
             val maxTextW = s - innerMargin * 2.0
             val maxTextH = s - innerMargin * 2.0
 
-            // 2. 自适应超大号清晰数字（或 Zzz）
+            // 2. 自适应清晰数字（或 Zzz），与四周边框保持舒适间距
             if (percent != null) {
                 val pct = percent.coerceIn(0, 100)
                 val label = pct.toString()
-                val targetHeightRatio = if (pct >= 100) 0.54 else 0.72
-                val tracking = if (pct >= 100) -0.04f else -0.02f
+                val targetHeightRatio = if (pct >= 100) 0.56 else 0.72
+                val tracking = if (pct >= 100) -0.04f else -0.01f
                 val font = fitFont(g, label, maxTextW, maxTextH * targetHeightRatio, tracking)
 
-                val shiftX = if (charging) -s * 0.04 else 0.0
-                val shiftY = if (charging) s * 0.04 else 0.0
+                val shiftX = if (charging) -s * 0.035 else 0.0
+                val shiftY = if (charging) s * 0.035 else 0.0
                 drawVisuallyCentered(g, label, font, textColor, s / 2.0 + shiftX, s / 2.0 + shiftY)
 
                 // 3. 充电状态：右上角紧凑翠绿圆形闪电角标（带透明隔离切口，零挤压数字）
                 if (charging) {
-                    val badgeR = (s * 0.18).coerceAtLeast(3.0)
+                    val badgeR = (s * 0.175).coerceAtLeast(3.0)
                     val cutR = badgeR + (s * 0.035).coerceAtLeast(0.8)
                     val cx = s - badgeR - 0.3
                     val cy = badgeR + 0.3

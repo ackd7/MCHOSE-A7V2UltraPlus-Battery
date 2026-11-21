@@ -299,7 +299,7 @@ fun MochiButtonRow(
 }
 
 /**
- * 醒目的 G2 超椭圆胶囊主操作按钮（带液态渐变高光与果冻回弹按压手感）。
+ * 醒目的 G2 超椭圆纯色胶囊主操作按钮（带果冻回弹按压手感）。
  */
 @Composable
 fun MochiPrimaryButton(
@@ -315,12 +315,10 @@ fun MochiPrimaryButton(
     val base = accentColor ?: c.accent
     val shape = G2RoundedShape(14.dp)
 
-    val bgBrush = if (enabled) {
-        val top = if (hovered) lerpColor(base, Color.White, 0.12f) else lerpColor(base, Color.White, 0.05f)
-        val bottom = lerpColor(base, Color.Black, 0.08f)
-        Brush.verticalGradient(listOf(top, bottom))
-    } else {
-        Brush.verticalGradient(listOf(c.fill, c.fill))
+    val bgColor = when {
+        !enabled -> c.fill
+        hovered -> lerpColor(base, Color.White, 0.08f)
+        else -> base
     }
 
     Box(
@@ -328,25 +326,8 @@ fun MochiPrimaryButton(
             .fillMaxWidth()
             .height(42.dp)
             .mochiPressScale(interaction, enabled = enabled, pressedScale = 0.97f)
-            .then(
-                if (enabled) {
-                    Modifier.shadow(
-                        elevation = 10.dp,
-                        shape = shape,
-                        ambientColor = base.copy(alpha = 0.28f),
-                        spotColor = base.copy(alpha = 0.34f),
-                    )
-                } else {
-                    Modifier
-                },
-            )
             .clip(shape)
-            .background(bgBrush)
-            .border(
-                1.dp,
-                if (enabled) Color.White.copy(alpha = 0.25f) else c.cardBorder,
-                shape,
-            )
+            .background(bgColor)
             .then(
                 if (enabled) {
                     Modifier
@@ -357,7 +338,7 @@ fun MochiPrimaryButton(
                             onClick = onClick,
                         )
                 } else {
-                    Modifier
+                    Modifier.border(1.dp, c.cardBorder, shape)
                 },
             ),
         contentAlignment = Alignment.Center,
@@ -502,14 +483,10 @@ fun MochiDropdownRow(
                         }
                         .width(196.dp)
                         .heightIn(max = 264.dp)
-                        .shadow(22.dp, menuShape, ambientColor = Color.Black.copy(alpha = 0.18f))
+                        .shadow(16.dp, menuShape, ambientColor = Color.Black.copy(alpha = 0.16f))
                         .clip(menuShape)
-                        .background(c.glassSurface)
-                        .border(
-                            1.dp,
-                            Brush.verticalGradient(listOf(c.glassBorderTop, c.glassBorderBottom)),
-                            menuShape,
-                        )
+                        .background(c.card)
+                        .border(1.dp, c.cardBorder, menuShape)
                         .verticalScroll(rememberScrollState())
                         .padding(6.dp),
                 ) {

@@ -339,39 +339,13 @@ private fun BatteryHeroCard(
         label = "heroFrac",
     )
 
-    // 充电时的微妙流光呼吸动画
-    val infinite = rememberInfiniteTransition(label = "chargePulse")
-    val pulseAlpha by infinite.animateFloat(
-        initialValue = 0.14f,
-        targetValue = 0.28f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "auraPulse",
-    )
-    val auraAlpha = if (battery.charging && !sleeping) pulseAlpha else if (c.isDark) 0.16f else 0.10f
-
     Box(
         modifier = modifier.mochiGlassSurface(
             colors = c,
             cornerRadius = 26.dp,
-            elevation = if (c.isDark) 10.dp else 14.dp,
+            elevation = if (c.isDark) 6.dp else 10.dp,
         ),
     ) {
-        // 顶部柔和环境光晕（Ambient Aura Glow）
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(tone.copy(alpha = auraAlpha), Color.Transparent),
-                    center = Offset(size.width * 0.5f, size.height * 0.34f),
-                    radius = size.maxDimension * 0.62f,
-                ),
-                center = Offset(size.width * 0.5f, size.height * 0.34f),
-                radius = size.maxDimension * 0.62f,
-            )
-        }
-
         Column(
             modifier = (if (stretch) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                 .padding(horizontal = 24.dp, vertical = 22.dp),
@@ -517,15 +491,7 @@ private fun HyperOsCapsuleMeter(
                         .fillMaxWidth(clamped)
                         .fillMaxHeight()
                         .clip(shape)
-                        .background(
-                            Brush.horizontalGradient(
-                                listOf(
-                                    fillColor.copy(alpha = 0.85f),
-                                    fillColor,
-                                    if (charging) Color(0xFF4ADE80) else fillColor,
-                                ),
-                            ),
-                        ),
+                        .background(fillColor),
                 )
             }
         }
@@ -1453,6 +1419,10 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "3.3.0-beta.4" to listOf(
+        "移除主页电量数字背景泛光与各处渐变高光，所有卡片、按钮、电量条与标签栏统一改为干净纯色",
+        "加大任务栏托盘小图标数字与圆角方框之间的内边距，视觉更舒展不贴边",
+    ),
     "3.3.0-beta.3" to listOf(
         "修复 4K / 高 DPI 缩放（如 175% / 200%）下托盘图标模糊的问题：改用 MultiResolutionImage 1:1 物理像素直绘",
         "收紧托盘边框外边距并大幅放大 Segoe UI 粗体数字字号，任务栏清晰度与视觉大小显著提升",
@@ -1526,8 +1496,8 @@ private fun AboutOverlay(onClose: () -> Unit) {
                 .mochiGlassSurface(
                     colors = c,
                     cornerRadius = 26.dp,
-                    elevation = 24.dp,
-                    backgroundColor = c.glassSurface,
+                    elevation = 18.dp,
+                    backgroundColor = c.card,
                 )
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },

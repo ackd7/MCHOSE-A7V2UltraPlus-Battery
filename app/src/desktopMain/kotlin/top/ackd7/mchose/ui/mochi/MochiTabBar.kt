@@ -78,48 +78,30 @@ fun MochiTabBar(
         label = "indicator",
     )
 
-    val glassRim = Brush.verticalGradient(
-        0f to c.glassBorderTop,
-        0.55f to c.cardBorder,
-        1f to c.glassBorderBottom,
-    )
-    val indicatorFill = Brush.verticalGradient(
-        0f to c.accent.copy(alpha = if (c.isDark) 0.28f else 0.16f),
-        1f to c.accent.copy(alpha = if (c.isDark) 0.18f else 0.10f),
-    )
+    val indicatorFill = c.accent.copy(alpha = if (c.isDark) 0.22f else 0.13f)
 
     Box(
         modifier = modifier
             .width(barWidth)
             .height(itemHeight + padding * 2)
             .shadow(
-                elevation = if (c.isDark) 22.dp else 20.dp,
+                elevation = if (c.isDark) 16.dp else 14.dp,
                 shape = containerShape,
-                ambientColor = Color.Black.copy(alpha = if (c.isDark) 0.40f else 0.10f),
-                spotColor = Color.Black.copy(alpha = if (c.isDark) 0.50f else 0.16f),
+                ambientColor = Color.Black.copy(alpha = if (c.isDark) 0.34f else 0.08f),
+                spotColor = Color.Black.copy(alpha = if (c.isDark) 0.42f else 0.12f),
             )
             .clip(containerShape)
-            .background(c.glassSurface)
-            .border(1.dp, glassRim, containerShape),
+            .background(c.card)
+            .border(1.dp, c.cardBorder, containerShape),
     ) {
-        // 液态玻璃选中指示胶囊
+        // 纯色选中指示胶囊
         Box(
             modifier = Modifier
                 .offset(x = indicatorOffset, y = padding)
                 .width(itemWidth)
                 .height(itemHeight)
                 .clip(indicatorShape)
-                .background(indicatorFill)
-                .border(
-                    1.dp,
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = if (c.isDark) 0.22f else 0.72f),
-                            c.accent.copy(alpha = 0.16f),
-                        ),
-                    ),
-                    indicatorShape,
-                ),
+                .background(indicatorFill),
         )
 
         Row(
