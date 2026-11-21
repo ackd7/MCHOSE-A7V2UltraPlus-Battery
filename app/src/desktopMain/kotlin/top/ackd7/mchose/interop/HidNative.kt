@@ -24,6 +24,11 @@ object HidNative {
 
     private const val HID_GUID = "4D1E55B2-F16F-11CF-88CB-001111000030"
 
+    /** 串行化同一 HID 厂商通道上的读写，避免电量轮询与鼠标配置读写并发串包。 */
+    private val ioLock = Any()
+
+    fun <T> withDeviceLock(block: () -> T): T = synchronized(ioLock, block)
+
     // ---------- 常量 ----------
 
     private const val FILE_SHARE_RW = WinNT.FILE_SHARE_READ or WinNT.FILE_SHARE_WRITE

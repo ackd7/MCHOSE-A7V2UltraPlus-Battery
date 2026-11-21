@@ -105,11 +105,13 @@ fun App(
     monitor: BatteryMonitor,
     battery: BatteryInfo,
     updateInfo: UpdateInfo,
+    themeMode: String,
+    onThemeModeChange: (String) -> Unit,
+    onShowPercentChange: () -> Unit,
     titleBar: @Composable () -> Unit,
     onExitRequested: () -> Unit,
     initialPage: Int = 0,
 ) {
-    var themeMode by remember { mutableStateOf(settings.themeMode) }
     var showAbout by remember { mutableStateOf(false) }
     // 开发用：--about 启动即打开关于弹窗
     LaunchedEffect(Unit) {
@@ -174,14 +176,15 @@ fun App(
                                     0 -> BatteryPage(settings, monitor, battery, wide)
                                     1 -> MousePage(settings, mouseState, wide)
                                     else -> SettingsPage(
-                                    settings = settings,
-                                    updateInfo = updateInfo,
-                                    onExitRequested = onExitRequested,
-                                    wide = wide,
-                                    themeMode = themeMode,
-                                    onThemeModeChange = { themeMode = it },
-                                    onShowAbout = { showAbout = true },
-                                )
+                                        settings = settings,
+                                        updateInfo = updateInfo,
+                                        onExitRequested = onExitRequested,
+                                        wide = wide,
+                                        themeMode = themeMode,
+                                        onThemeModeChange = onThemeModeChange,
+                                        onShowPercentChange = onShowPercentChange,
+                                        onShowAbout = { showAbout = true },
+                                    )
                                 }
                             }
                         }
@@ -385,7 +388,7 @@ private fun RefreshSection(
                 monitor.setInterval(refreshSeconds)
             },
         )
-        MochiButtonRow(text = "立即刷新", onClick = { monitor.refresh() })
+        MochiButtonRow(text = "立即刷新", onClick = { monitor.requestRefresh() })
     }
 }
 
@@ -692,6 +695,7 @@ private fun SettingsPage(
     wide: Boolean,
     themeMode: String,
     onThemeModeChange: (String) -> Unit,
+    onShowPercentChange: () -> Unit,
     onShowAbout: () -> Unit,
 ) {
     var autoStart by remember { mutableStateOf(settings.autoStart) }
@@ -748,6 +752,7 @@ private fun SettingsPage(
                             showPercent = checked
                             settings.showPercentInTray = checked
                             settings.save()
+                            onShowPercentChange()
                         },
                     )
                 },
@@ -803,7 +808,7 @@ private fun SettingsPage(
                 MochiDropdownRow(
                     title = "提醒阈值",
                     options = thresholds.map { "$it%" },
-                    selectedIndex = thresholds.indexOf(alertThreshold).coerceAtLeast(4),
+                    selectedIndex = thresholds.indexOf(alertThreshold).let { if (it >= 0) it else 4 },
                     onSelect = { idx ->
                         alertThreshold = thresholds[idx]
                         settings.alertThreshold = alertThreshold
@@ -896,6 +901,26 @@ private fun SettingsPage(
 
 /** 内置的更新摘要（发版时同步维护）。 */
 private val RecentChanges = listOf(
+    "3.2.2" to listOf(
+        "修复鼠标休眠时上次电量读数与时间戳被覆盖的问题",
+        "修复低电量提醒阈值低于 30% 时下拉显示错位的问题",
+        "修复托盘右键「打开面板」无法还原最小化窗口及退出残留图标问题",
+        "托盘右键菜单同步跟随深色 / 浅色外观，切换「托盘显示电量」即时生效",
+        "手动「立即刷新」改为后台异步执行，不再卡顿界面",
+        "为 HID 读写加互斥锁，避免电量轮询与 DPI/回报率操作并发冲突",
+    ),
+    "3.2.1" to listOf(
+        "修复升级后开机自启仍指向旧版可执行文件的问题，启动时自动迁移",
+    ),
+    "3.2.0" to listOf(
+        "内部标识与安装/配置目录统一更名为 MCHOSE-A7V2UltraPlus-Battery，并自动迁移旧配置",
+    ),
+    "3.1.2" to listOf(
+        "仓库与安装包统一更名，同步更新检查与主页链接",
+    ),
+    "3.1.1" to listOf(
+        "修复拖动窗口时文字和图标发抖；软件更名为 MCHOSE A7 V2 Ultra+ Battery",
+    ),
     "3.1.0" to listOf(
         "新增浅色 / 深色 / 跟随系统三种外观",
         "新增低电量提醒，阈值可自选",

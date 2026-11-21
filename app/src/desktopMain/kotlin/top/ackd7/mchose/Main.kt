@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -52,10 +50,12 @@ import top.ackd7.mchose.services.NativeTrayIcon
 import top.ackd7.mchose.services.UpdateChecker
 import top.ackd7.mchose.services.UpdateInfo
 import top.ackd7.mchose.ui.App
+import top.ackd7.mchose.ui.AppTheme
+import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.2.1"
+const val APP_VERSION = "3.2.2"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -123,12 +123,48 @@ fun main(args: Array<String>) {
         var updateInfo by remember { mutableStateOf(UpdateInfo()) }
         // 读数状态集中在这里，再传给 UI（避免多处覆盖 onReadingChanged 导致 UI 收不到）
         var battery by remember { mutableStateOf(BatteryInfo()) }
+        var themeMode by remember { mutableStateOf(settings.themeMode) }
         var isVisible by remember { mutableStateOf(!startMinimized) }
         // 托盘右键菜单（Compose 自绘窗口，规避 AWT 菜单中文乱码）
         var menuVisible by remember { mutableStateOf(false) }
         // 每次「从托盘打开」都自增，强制在 AWT 层把窗口恢复出来
         // （只靠 isVisible 布尔值不够：窗口被最小化时 isVisible 仍是 true，置 true 是空操作）
         var showToken by remember { mutableIntStateOf(0) }
+
+        fun syncTrayIcon(info: BatteryInfo) {
+            val t = tray ?: return
+            javax.swing.SwingUtilities.invokeLater {
+                if (settings.showPercentInTray && info.success && info.percent >= 0) {
+                    t.setIcon(
+                        info.percent,
+                        info.charging,
+                        APP_NAME + "  ${info.percent}%" +
+                            (if (info.stale) "（休眠，上次读数）" else if (info.charging) "  充电中" else "  放电中"),
+                    )
+                } else {
+                    val tip = if (info.success && info.percent >= 0) {
+                        APP_NAME + "  ${info.percent}%" +
+                            (if (info.stale) "（休眠，上次读数）" else if (info.charging) "  充电中" else "  放电中")
+                    } else {
+                        "$APP_NAME（设备休眠/未连接）"
+                    }
+                    t.setIcon(null, false, tip)
+                }
+            }
+        }
+
+        fun openMainWindow() {
+            menuVisible = false
+            isVisible = true
+            showToken++
+        }
+
+        fun shutdownApp() {
+            menuVisible = false
+            tray?.close()
+            monitor.stop()
+            javax.swing.SwingUtilities.invokeLater { exitApplication() }
+        }
 
         // 横向窗口；--narrow 为开发用（验证窄屏单列布局）
         val windowState = rememberWindowState(
@@ -142,13 +178,10 @@ fun main(args: Array<String>) {
             try {
                 val t = NativeTrayIcon()
                 t.accent = java.awt.Color(0x34, 0x82, 0xFF)
-                t.onOpen = { menuVisible = false; isVisible = true; showToken++ }
+                t.onOpen = { openMainWindow() }
                 t.onMenu = { menuVisible = !menuVisible }
-                t.onRefresh = { monitor.refresh() }
-                t.onExit = {
-                    monitor.stop()
-                    javax.swing.SwingUtilities.invokeLater { exitApplication() }
-                }
+                t.onRefresh = { monitor.requestRefresh() }
+                t.onExit = { shutdownApp() }
                 tray = t
                 t.setIcon(null, false, APP_NAME)
                 appLog("托盘已创建")
@@ -161,12 +194,13 @@ fun main(args: Array<String>) {
             // 低电量提醒：降到阈值提醒一次，电量回升（阈值 +5）后重新待命
             var alertArmed = true
             monitor.onReadingChanged = { info ->
-                // 设备休眠时固件会返回全 0；此时保留上一次成功读数，避免界面突然变 "--"
+                // 设备休眠时固件会返回全 0；此时保留上一次成功读数的快照，避免界面突然变 "--"
                 val effective = if (info.success) {
-                    lastGood = info
-                    info
+                    val snapshot = info.copy()
+                    lastGood = snapshot
+                    snapshot
                 } else {
-                    lastGood?.copy(stale = true, error = info.error, charging = false) ?: info
+                    lastGood?.copy(stale = true, error = info.error, charging = false) ?: info.copy()
                 }
                 battery = effective
                 val brief = "ok=${info.success} stale=${effective.stale} pct=${effective.percent} err=${info.error}"
@@ -174,8 +208,8 @@ fun main(args: Array<String>) {
                     lastLogged = brief
                     appLog("读数: $brief")
                 }
-                // 低电量提醒
-                if (settings.lowBatteryAlert && effective.success && !effective.charging) {
+                // 低电量提醒（仅在非休眠且未充电时触发）
+                if (settings.lowBatteryAlert && effective.success && !effective.stale && !effective.charging) {
                     val threshold = settings.alertThreshold
                     if (effective.percent in 0..100) {
                         if (effective.percent <= threshold && alertArmed) {
@@ -191,29 +225,10 @@ fun main(args: Array<String>) {
                     }
                 }
 
-                val t = tray
-                if (t != null) {
-                    javax.swing.SwingUtilities.invokeLater {
-                        if (settings.showPercentInTray && effective.success && effective.percent >= 0) {
-                            t.setIcon(
-                                effective.percent,
-                                effective.charging,
-                                APP_NAME + "  ${effective.percent}%" +
-                                    (if (effective.stale) "（休眠，上次读数）" else if (effective.charging) "  充电中" else "  放电中"),
-                            )
-                        } else {
-                            t.setIcon(null, false, "$APP_NAME（设备休眠/未连接）")
-                        }
-                    }
-                }
+                syncTrayIcon(effective)
             }
             monitor.start(settings.refreshSeconds)
             appLog("监控已启动")
-
-            if (args.contains("--test-menu")) {
-                kotlinx.coroutines.delay(1500)
-                menuVisible = true
-            }
 
             // 开机自启迁移：旧版本写的是 A7Battery 注册表值 + 旧 exe 路径，
             // 升级后旧 exe 已不存在。按设置里的开关重写一次，顺带清掉旧值。
@@ -267,188 +282,6 @@ fun main(args: Array<String>) {
                 })
             }
 
-            // 开发用：点开「自动刷新间隔」下拉，验证弹出动画与面板位置
-            LaunchedEffect(Unit) {
-                if (args.contains("--test-dropdown")) {
-                    kotlinx.coroutines.delay(3000)
-                    win.isAlwaysOnTop = true
-                    win.toFront()
-                    win.requestFocus()
-                    kotlinx.coroutines.delay(700)
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            val robot = java.awt.Robot()
-                            // 电量页右列「自动刷新间隔」这一行
-                            val x = win.x + win.width * 3 / 4
-                            val y = win.y + 122
-                            robot.mouseMove(x, y)
-                            Thread.sleep(150)
-                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(60)
-                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(500)
-                            val img = robot.createScreenCapture(win.bounds)
-                            javax.imageio.ImageIO.write(
-                                img,
-                                "png",
-                                java.io.File(System.getProperty("java.io.tmpdir"), "a7-dropdown.png"),
-                            )
-                        }.onFailure { appLog("下拉测试失败: " + it.message) }
-                    }
-                    appLog("下拉测试：已点开选项并截图")
-                    win.isAlwaysOnTop = false
-                }
-            }
-
-            // 开发用：Robot 点击底部「鼠标」标签，并在动画中途截图（验证滑动切换）
-            LaunchedEffect(Unit) {
-                val switchArg = args.firstOrNull { it.startsWith("--test-switch") }
-                if (switchArg != null) {
-                    val tabIndex = switchArg.substringAfter("=", "2").toIntOrNull() ?: 2
-                    kotlinx.coroutines.delay(3000)
-                    win.isAlwaysOnTop = true
-                    win.toFront()
-                    win.requestFocus()
-                    kotlinx.coroutines.delay(700)
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            val robot = java.awt.Robot()
-                            val x = win.x + win.width / 2 + (tabIndex - 2) * 84  // 标签项宽 84dp
-                            val y = win.y + win.height - 44    // 悬浮标签栏位置
-                            robot.mouseMove(x, y)
-                            Thread.sleep(120)
-                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(60)
-                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            // 连拍 10 帧（25ms 间隔），捕捉滑动过程
-                            for (i in 1..10) {
-                                Thread.sleep(25)
-                                val img = robot.createScreenCapture(win.bounds)
-                                javax.imageio.ImageIO.write(
-                                    img,
-                                    "png",
-                                    java.io.File(
-                                        System.getProperty("java.io.tmpdir"),
-                                        "a7-sw-$i.png",
-                                    ),
-                                )
-                            }
-                        }.onFailure { appLog("切换测试失败: " + it.message) }
-                    }
-                    appLog("测试切换：已点击「鼠标」标签并截图")
-                    win.isAlwaysOnTop = false
-                }
-            }
-
-            // 开发用：Robot 拖拽标题栏，验证窗口跟随鼠标且不会飞出屏幕
-            // 注意 Robot 操作必须放在 IO 线程，否则 Thread.sleep 阻塞 EDT 会让指针事件滞后
-            LaunchedEffect(Unit) {
-                if (args.contains("--test-drag")) {
-                    kotlinx.coroutines.delay(3000)
-                    win.isAlwaysOnTop = true
-                    win.toFront()
-                    win.requestFocus()
-                    kotlinx.coroutines.delay(800)
-                    val before = win.bounds
-                    val moved = withContext(Dispatchers.IO) {
-                        runCatching {
-                            val robot = java.awt.Robot()
-                            val startX = before.x + 120
-                            val startY = before.y + 24
-                            robot.mouseMove(startX, startY)
-                            Thread.sleep(250)
-                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(150)
-                            for (step in 1..20) {
-                                robot.mouseMove(startX + step * 10, startY + step * 6)
-                                Thread.sleep(30)
-                            }
-                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(600)
-                            true
-                        }.getOrElse {
-                            appLog("测试拖拽异常: " + it.message)
-                            false
-                        }
-                    }
-                    kotlinx.coroutines.delay(400)
-                    val after = win.bounds
-                    appLog(
-                        "测试拖拽(after=$moved)：before=(${before.x},${before.y}) " +
-                            "after=(${after.x},${after.y}) 期望≈(200,120) " +
-                            "实际=(${after.x - before.x},${after.y - before.y}) " +
-                            "visible=${win.isVisible} state=${win.extendedState}",
-                    )
-                    runCatching {
-                        val img = java.awt.Robot().createScreenCapture(win.bounds)
-                        val out = java.io.File(System.getProperty("java.io.tmpdir"), "a7-drag.png")
-                        javax.imageio.ImageIO.write(img, "png", out)
-                        appLog("测试拖拽：截图 = " + out.absolutePath)
-                    }
-                    win.isAlwaysOnTop = false
-                }
-            }
-
-            // 开发用：用 Robot 点击标题栏空白处（标题右侧、按钮左侧），复现「点空白就消失」
-            LaunchedEffect(Unit) {
-                if (args.contains("--test-titlebar")) {
-                    kotlinx.coroutines.delay(3000)
-                    runCatching {
-                        val b = win.bounds
-                        val robot = java.awt.Robot()
-                        // 标题栏同一行、按钮左侧的空白区域，横向点三处
-                        val offsets = intArrayOf(-420, -300, -180)
-                        for (dx in offsets) {
-                            val x = b.x + b.width + dx
-                            val y = b.y + 24
-                            robot.mouseMove(x, y)
-                            Thread.sleep(150)
-                            robot.mousePress(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(90)
-                            robot.mouseRelease(java.awt.event.InputEvent.BUTTON1_DOWN_MASK)
-                            Thread.sleep(600)
-                            appLog(
-                                "测试：点击($x,$y) 后 visible=${win.isVisible} " +
-                                    "state=${win.extendedState} maximized=" +
-                                    ((win.extendedState and java.awt.Frame.MAXIMIZED_BOTH) != 0),
-                            )
-                        }
-                        val img = java.awt.Robot().createScreenCapture(win.bounds)
-                        val out = java.io.File(System.getProperty("java.io.tmpdir"), "a7-titlebar.png")
-                        javax.imageio.ImageIO.write(img, "png", out)
-                        appLog("测试：点击后截图 = " + out.absolutePath)
-                    }.onFailure { appLog("测试失败: " + it.message) }
-                }
-            }
-
-            // 开发用：连续切换最大化 4 次，验证不会出现异常最小化
-            LaunchedEffect(Unit) {
-                if (args.contains("--test-max")) {
-                    kotlinx.coroutines.delay(2500)
-                    repeat(4) { i ->
-                        val maximized =
-                            (win.extendedState and java.awt.Frame.MAXIMIZED_BOTH) != 0
-                        win.extendedState =
-                            if (maximized) java.awt.Frame.NORMAL else java.awt.Frame.MAXIMIZED_BOTH
-                        appLog("测试：第 ${i + 1} 次切换最大化（原状态=${if (maximized) "最大化" else "普通"}）")
-                        kotlinx.coroutines.delay(1200)
-                    }
-                }
-            }
-
-            // 开发用：模拟「窗口被最小化后从托盘打开」，验证恢复逻辑
-            LaunchedEffect(Unit) {
-                if (args.contains("--test-restore")) {
-                    kotlinx.coroutines.delay(2500)
-                    appLog("测试：手动最小化窗口")
-                    win.isMinimized = true
-                    kotlinx.coroutines.delay(1500)
-                    appLog("测试：模拟点击托盘打开")
-                    isVisible = true
-                    showToken++
-                }
-            }
-
             // 显隐：只在这里改 AWT 状态，避免 Compose 的 visible 参数与手动操作互相打架
             LaunchedEffect(isVisible) {
                 if (isVisible) {
@@ -470,29 +303,14 @@ fun main(args: Array<String>) {
                 appLog("托盘恢复窗口 #$showToken（minimized=${win.isMinimized}, visible=${win.isVisible}）")
             }
 
-            // 开发用：--screenshot 时把本窗口截图存到临时目录（便于无交互验证 UI）
-            LaunchedEffect(Unit) {
-                if (args.contains("--screenshot")) {
-                    kotlinx.coroutines.delay(3000)
-                    runCatching {
-                        win.isAlwaysOnTop = true
-                        win.toFront()
-                        win.requestFocus()
-                        Thread.sleep(900)
-                        val img = java.awt.Robot().createScreenCapture(win.bounds)
-                        val out = java.io.File(System.getProperty("java.io.tmpdir"), "a7-window.png")
-                        javax.imageio.ImageIO.write(img, "png", out)
-                        appLog("截图已保存: " + out.absolutePath)
-                        win.isAlwaysOnTop = false
-                    }.onFailure { appLog("截图失败: " + it.message) }
-                }
-            }
-
             App(
                 settings = settings,
                 monitor = monitor,
                 battery = battery,
                 updateInfo = updateInfo,
+                themeMode = themeMode,
+                onThemeModeChange = { themeMode = it },
+                onShowPercentChange = { syncTrayIcon(battery) },
                 titleBar = {
                     AppTitleBar(
                         window = win,
@@ -519,11 +337,7 @@ fun main(args: Array<String>) {
                         },
                     )
                 },
-                onExitRequested = {
-                    tray?.close()
-                    monitor.stop()
-                    exitApplication()
-                },
+                onExitRequested = { shutdownApp() },
                 initialPage = initialPage,
             )
         }
@@ -541,6 +355,8 @@ fun main(args: Array<String>) {
             val win = window
             LaunchedEffect(Unit) {
                 appLog("托盘菜单已创建")
+                runCatching { applyRoundedCorners(win) }
+                runCatching { win.rootPane.border = null }
                 win.addWindowFocusListener(object : java.awt.event.WindowAdapter() {
                     override fun windowLostFocus(e: java.awt.event.WindowEvent?) {
                         menuVisible = false
@@ -560,15 +376,13 @@ fun main(args: Array<String>) {
                     appLog("托盘菜单已显示 @ $x,$y")
                 }
             }
-            TrayMenu(
-                onOpen = { menuVisible = false; isVisible = true },
-                onRefresh = { menuVisible = false; monitor.refresh() },
-                onExit = {
-                    menuVisible = false
-                    monitor.stop()
-                    javax.swing.SwingUtilities.invokeLater { exitApplication() }
-                },
-            )
+            AppTheme(themeModeOf(themeMode)) {
+                TrayMenu(
+                    onOpen = { openMainWindow() },
+                    onRefresh = { menuVisible = false; monitor.requestRefresh() },
+                    onExit = { shutdownApp() },
+                )
+            }
         }
     }
 }
@@ -672,36 +486,6 @@ private fun Modifier.dragWindow(
             },
         )
     }
-
-/** jna-platform 的 User32 没暴露 ReleaseCapture，这里自行声明。 */
-private interface User32Extra : com.sun.jna.Library {
-    fun ReleaseCapture(): Boolean
-    fun SendMessage(
-        hWnd: com.sun.jna.platform.win32.WinDef.HWND,
-        msg: Int,
-        wParam: Long,
-        lParam: Long,
-    ): Long
-}
-
-private val user32Extra: User32Extra by lazy {
-    com.sun.jna.Native.load(
-        "user32",
-        User32Extra::class.java,
-        com.sun.jna.win32.W32APIOptions.DEFAULT_OPTIONS,
-    )
-}
-
-/** 让 Windows 接管标题栏拖拽（会阻塞当前线程直到拖拽结束，属预期行为）。 */
-private fun startNativeWindowDrag(window: java.awt.Window) {
-    runCatching {
-        val hwnd = com.sun.jna.platform.win32.WinDef.HWND(
-            com.sun.jna.Native.getWindowPointer(window),
-        )
-        user32Extra.ReleaseCapture()
-        user32Extra.SendMessage(hwnd, 0x00A1, 2L, 0L)
-    }.onFailure { appLog("原生拖拽失败: " + it.message) }
-}
 
 /** 保证窗口至少有一块留在某个屏幕内。 */
 private fun clampToScreen(window: java.awt.Window, x: Int, y: Int): Pair<Int, Int> {

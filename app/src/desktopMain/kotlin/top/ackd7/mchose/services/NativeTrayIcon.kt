@@ -35,7 +35,7 @@ class NativeTrayIcon : AutoCloseable {
         }
         trayIcon = TrayIcon(createIcon(null, false))
         trayIcon.isImageAutoSize = true
-        trayIcon.toolTip = "A7 电量助手"
+        trayIcon.toolTip = top.ackd7.mchose.APP_NAME
 
         trayIcon.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {

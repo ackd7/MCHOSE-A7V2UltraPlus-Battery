@@ -50,26 +50,26 @@ class MouseConfigService {
         return found
     }
 
-    fun read(): MouseConfig {
+    fun read(): MouseConfig = HidNative.withDeviceLock {
         val r = MouseConfig()
         val devices = discover()
         if (devices.isEmpty()) {
             r.error = "未找到迈从设备 HID 通道（请先连接鼠标并轻动一下）"
-            return r
+            return@withDeviceLock r
         }
 
         var last: Exception? = null
         for (dev in devices) {
             try {
                 val cfg = readOne(dev)
-                if (cfg.success) return cfg
+                if (cfg.success) return@withDeviceLock cfg
                 last = Exception(cfg.error)
             } catch (ex: Exception) {
                 last = ex
             }
         }
         r.error = last?.message ?: "读取失败"
-        return r
+        r
     }
 
     private fun readOne(dev: HidDeviceInfo): MouseConfig {
@@ -159,9 +159,9 @@ class MouseConfigService {
         return write(ridShort, cmdRateWrite, args)
     }
 
-    private fun write(rid: Byte, cmd: Byte, args: ByteArray?): Pair<Boolean, String> {
+    private fun write(rid: Byte, cmd: Byte, args: ByteArray?): Pair<Boolean, String> = HidNative.withDeviceLock {
         val devices = discover()
-        if (devices.isEmpty()) return false to "未找到迈从设备 HID 通道"
+        if (devices.isEmpty()) return@withDeviceLock false to "未找到迈从设备 HID 通道"
 
         var last: Exception? = null
         for (dev in devices) {
@@ -182,13 +182,13 @@ class MouseConfigService {
                         return@use
                     }
                     Thread.sleep(300)
-                    return true to ""
+                    return@withDeviceLock true to ""
                 }
             } catch (ex: Exception) {
                 last = ex
             }
         }
-        return false to (last?.message ?: "写入失败")
+        false to (last?.message ?: "写入失败")
     }
 
     private fun buildFrame(rid: Byte, cmd: Byte, args: ByteArray?): ByteArray {

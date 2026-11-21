@@ -41,26 +41,28 @@ class MchoseBatteryReader {
         return found
     }
 
-    fun read(accumulate: BatteryInfo? = null): BatteryInfo {
-        val result = accumulate ?: BatteryInfo()
-        result.updatedAt = System.currentTimeMillis()
-        result.success = false
+    fun read(accumulate: BatteryInfo? = null): BatteryInfo = HidNative.withDeviceLock {
+        val preferredPath = accumulate?.lastPath.orEmpty()
+        val result = BatteryInfo(
+            updatedAt = System.currentTimeMillis(),
+            lastPath = preferredPath,
+        )
 
         val devices = discover()
         if (devices.isEmpty()) {
             result.error = "未找到迈从设备的 HID 通道（请确认鼠标已连接，或切换到 2.4G/有线模式）"
-            return result
+            return@withDeviceLock result
         }
 
-        val sorted = if (result.lastPath.isNotEmpty()) {
-            devices.sortedBy { if (it.path.equals(result.lastPath, ignoreCase = true)) 0 else 1 }
+        val sorted = if (preferredPath.isNotEmpty()) {
+            devices.sortedBy { if (it.path.equals(preferredPath, ignoreCase = true)) 0 else 1 }
         } else devices
 
         var lastEx: Exception? = null
         for (dev in sorted) {
             try {
                 val r = readOne(dev)
-                if (r.success) return r
+                if (r.success) return@withDeviceLock r
                 lastEx = Exception(r.error)
                 result.raw = r.raw
             } catch (ex: Exception) {
@@ -69,7 +71,7 @@ class MchoseBatteryReader {
         }
 
         result.error = lastEx?.message ?: "读取失败：设备可能处于深度休眠，请轻动鼠标后重试"
-        return result
+        result
     }
 
     private fun readOne(dev: HidDeviceInfo): BatteryInfo {
