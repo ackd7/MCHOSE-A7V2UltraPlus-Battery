@@ -1,5 +1,8 @@
 package top.ackd7.mchose
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -29,17 +33,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -48,6 +53,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.ackd7.mchose.services.AppSettings
 import top.ackd7.mchose.services.Autostart
@@ -66,9 +75,8 @@ import top.ackd7.mchose.ui.mochi.rememberMochiColors
 import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-const val APP_VERSION = "3.3.0-beta.4"
+const val APP_VERSION = "4.0.0"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -279,7 +287,6 @@ fun main(args: Array<String>) {
                 } else {
                     lastGood?.copy(stale = true, error = info.error, charging = false) ?: info.copy()
                 }
-                battery = effective
                 val brief = "ok=${info.success} stale=${effective.stale} pct=${effective.percent} err=${info.error}"
                 if (brief != lastLogged) {
                     lastLogged = brief
@@ -301,8 +308,11 @@ fun main(args: Array<String>) {
                         }
                     }
                 }
-
-                syncTrayIcon(effective)
+                // 切到 EDT 更新 Compose State 与托盘图标，避免 IO 线程并发修改 UI 状态
+                javax.swing.SwingUtilities.invokeLater {
+                    battery = effective
+                    syncTrayIcon(effective)
+                }
             }
             monitor.start(settings.refreshSeconds)
             appLog("监控已启动")
@@ -327,7 +337,111 @@ fun main(args: Array<String>) {
             visible = isVisible,
         ) {
             val win = window
+            val uiScope = rememberCoroutineScope()
             var isMax by remember { mutableStateOf(false) }
+            var normalBounds by remember { mutableStateOf<java.awt.Rectangle?>(null) }
+
+            // 窗口过渡动画状态（打开 / 关闭 / 缩小 / 放大）
+            val winScale = remember { Animatable(1f) }
+            val winAlpha = remember { Animatable(1f) }
+            val winOffsetY = remember { Animatable(0f) }
+            var transitionJob by remember { mutableStateOf<Job?>(null) }
+            var boundsAnimJob by remember { mutableStateOf<Job?>(null) }
+
+            fun playEnterAnimation() {
+                transitionJob?.cancel()
+                transitionJob = uiScope.launch {
+                    val ease = CubicBezierEasing(0.18f, 0.9f, 0.28f, 1f)
+                    winScale.snapTo(0.94f)
+                    winAlpha.snapTo(0f)
+                    winOffsetY.snapTo(14f)
+                    coroutineScope {
+                        launch { winScale.animateTo(1f, tween(190, easing = ease)) }
+                        launch { winAlpha.animateTo(1f, tween(160, easing = ease)) }
+                        launch { winOffsetY.animateTo(0f, tween(190, easing = ease)) }
+                    }
+                }
+            }
+
+            fun playCloseAnimation() {
+                transitionJob?.cancel()
+                transitionJob = uiScope.launch {
+                    val ease = CubicBezierEasing(0.4f, 0f, 0.85f, 0.7f)
+                    coroutineScope {
+                        launch { winScale.animateTo(0.92f, tween(145, easing = ease)) }
+                        launch { winAlpha.animateTo(0f, tween(140, easing = ease)) }
+                        launch { winOffsetY.animateTo(18f, tween(145, easing = ease)) }
+                    }
+                    hideMainWindow()
+                    winScale.snapTo(1f)
+                    winAlpha.snapTo(1f)
+                    winOffsetY.snapTo(0f)
+                }
+            }
+
+            fun playMinimizeAnimation() {
+                transitionJob?.cancel()
+                transitionJob = uiScope.launch {
+                    val ease = CubicBezierEasing(0.4f, 0f, 0.8f, 0.8f)
+                    coroutineScope {
+                        launch { winScale.animateTo(0.88f, tween(155, easing = ease)) }
+                        launch { winAlpha.animateTo(0f, tween(145, easing = ease)) }
+                        launch { winOffsetY.animateTo(36f, tween(155, easing = ease)) }
+                    }
+                    windowState.isMinimized = true
+                }
+            }
+
+            fun animateWindowBounds(from: java.awt.Rectangle, to: java.awt.Rectangle, onDone: () -> Unit = {}) {
+                boundsAnimJob?.cancel()
+                boundsAnimJob = uiScope.launch {
+                    val steps = 14
+                    val frameMs = 12L
+                    for (i in 1..steps) {
+                        val t = i.toFloat() / steps.toFloat()
+                        // Cubic ease-out 顺滑减速曲线
+                        val e = 1f - (1f - t) * (1f - t) * (1f - t)
+                        val x = (from.x + (to.x - from.x) * e).toInt()
+                        val y = (from.y + (to.y - from.y) * e).toInt()
+                        val w = (from.width + (to.width - from.width) * e).toInt()
+                        val h = (from.height + (to.height - from.height) * e).toInt()
+                        win.setBounds(x, y, w, h)
+                        delay(frameMs)
+                    }
+                    win.setBounds(to)
+                    onDone()
+                }
+            }
+
+            fun toggleMaximizeAnimated() {
+                if (!isMax) {
+                    val current = win.bounds
+                    normalBounds = java.awt.Rectangle(current)
+                    val target = currentScreenWorkArea(win)
+                    isMax = true
+                    appLog("切换最大化：普通 -> 放大工作区 $target")
+                    animateWindowBounds(current, target)
+                } else {
+                    val current = win.bounds
+                    val target = normalBounds ?: defaultCenteredBounds(win)
+                    isMax = false
+                    appLog("切换最大化：放大 -> 还原 $target")
+                    animateWindowBounds(current, target)
+                }
+            }
+
+            fun unmaximizeForDrag(pointerScreenX: Int, pointerScreenY: Int) {
+                if (!isMax) return
+                boundsAnimJob?.cancel()
+                val oldBounds = win.bounds
+                val restore = normalBounds ?: defaultCenteredBounds(win)
+                val ratioX = ((pointerScreenX - oldBounds.x).toDouble() / oldBounds.width.coerceAtLeast(1))
+                    .coerceIn(0.15, 0.85)
+                val nx = (pointerScreenX - restore.width * ratioX).toInt()
+                val ny = (pointerScreenY - 22).coerceAtLeast(currentScreenWorkArea(win).y)
+                isMax = false
+                win.setBounds(nx, ny, restore.width, restore.height)
+            }
 
             LaunchedEffect(Unit) {
                 runCatching {
@@ -338,12 +452,9 @@ fun main(args: Array<String>) {
                 }
                 runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
                 runCatching { applyRoundedCorners(win) }
-                // 去掉 Swing 默认边框，避免无边框窗口右/下缘出现一条细线
                 runCatching { win.rootPane.border = null }
 
-                // 记录窗口状态变化，便于排查「界面消失」类问题
                 win.addWindowStateListener { e ->
-                    isMax = (e.newState and java.awt.Frame.MAXIMIZED_BOTH) != 0
                     appLog("窗口状态变化: ${e.oldState} -> ${e.newState}（isMax=$isMax）")
                 }
                 win.addWindowListener(object : java.awt.event.WindowAdapter() {
@@ -353,18 +464,20 @@ fun main(args: Array<String>) {
 
                     override fun windowDeiconified(e: java.awt.event.WindowEvent?) {
                         appLog("窗口已还原（deiconified）")
+                        javax.swing.SwingUtilities.invokeLater { playEnterAnimation() }
                     }
                 })
             }
 
-            // 窗口重新显示时确保 Win11 圆角已生效（静默启动首次展示时 HWND 才真正映射）
+            // 窗口每次由隐藏变为可见时：套用 Win11 圆角并播放丝滑进入动画
             LaunchedEffect(isVisible) {
                 if (isVisible) {
                     runCatching { applyRoundedCorners(win) }
+                    playEnterAnimation()
                 }
             }
 
-            // 从托盘打开时强制恢复（含取消最小化 / Win32 还原置前 / 抢焦点）
+            // 从托盘打开时强制恢复（含取消最小化 / Win32 还原置前 / 抢焦点 + 进入动画）
             LaunchedEffect(showToken) {
                 if (showToken == 0) return@LaunchedEffect
                 val wasIconified = windowState.isMinimized ||
@@ -372,48 +485,52 @@ fun main(args: Array<String>) {
                 windowState.isMinimized = false
                 javax.swing.SwingUtilities.invokeLater {
                     restoreAndFocusWindow(win, wasIconified)
+                    playEnterAnimation()
                     appLog("托盘恢复窗口 #$showToken（wasIconified=$wasIconified, state=${win.extendedState}, visible=${win.isVisible}）")
                 }
             }
 
-            App(
-                settings = settings,
-                monitor = monitor,
-                battery = battery,
-                updateInfo = updateInfo,
-                themeMode = themeMode,
-                onThemeModeChange = { themeMode = it },
-                onShowPercentChange = { syncTrayIcon(battery) },
-                titleBar = {
-                    AppTitleBar(
-                        window = win,
-                        title = APP_NAME,
-                        subtitle = "v$APP_VERSION",
-                        battery = battery,
-                        isMaximized = isMax,
-                        onMinimize = {
-                            // 通过 windowState 最小化，保证 Compose 状态与底层窗口同步
-                            appLog("点击最小化 → 最小化到任务栏")
-                            windowState.isMinimized = true
-                        },
-                        onToggleMaximize = {
-                            // 必须以窗口真实状态为依据，不能用自己维护的布尔值（会与系统状态错位）
-                            val maximized =
-                                (win.extendedState and java.awt.Frame.MAXIMIZED_BOTH) != 0
-                            win.extendedState =
-                                if (maximized) java.awt.Frame.NORMAL
-                                else java.awt.Frame.MAXIMIZED_BOTH
-                            appLog("切换最大化：当前=${if (maximized) "最大化" else "普通"} → ${if (maximized) "普通" else "最大化"}")
-                        },
-                        onClose = {
-                            appLog("点击关闭 → 隐藏窗口")
-                            hideMainWindow()
-                        },
-                    )
-                },
-                onExitRequested = { shutdownApp() },
-                initialPage = initialPage,
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        scaleX = winScale.value
+                        scaleY = winScale.value
+                        alpha = winAlpha.value
+                        translationY = winOffsetY.value
+                    },
+            ) {
+                App(
+                    settings = settings,
+                    monitor = monitor,
+                    battery = battery,
+                    updateInfo = updateInfo,
+                    themeMode = themeMode,
+                    onThemeModeChange = { themeMode = it },
+                    onShowPercentChange = { syncTrayIcon(battery) },
+                    titleBar = {
+                        AppTitleBar(
+                            window = win,
+                            title = APP_NAME,
+                            subtitle = "v$APP_VERSION",
+                            battery = battery,
+                            isMaximized = isMax,
+                            onDragStartFromMaximized = { px, py -> unmaximizeForDrag(px, py) },
+                            onMinimize = {
+                                appLog("点击最小化 → 缩小动画并最小化到任务栏")
+                                playMinimizeAnimation()
+                            },
+                            onToggleMaximize = { toggleMaximizeAnimated() },
+                            onClose = {
+                                appLog("点击关闭 → 关闭动画并隐藏到托盘")
+                                playCloseAnimation()
+                            },
+                        )
+                    },
+                    onExitRequested = { shutdownApp() },
+                    initialPage = initialPage,
+                )
+            }
         }
 
         // 托盘右键菜单：常驻的 Compose 小窗口（只切 visible，避免销毁窗口导致应用退出）
@@ -477,6 +594,7 @@ private fun AppTitleBar(
     subtitle: String,
     battery: BatteryInfo,
     isMaximized: Boolean,
+    onDragStartFromMaximized: (Int, Int) -> Unit,
     onMinimize: () -> Unit,
     onToggleMaximize: () -> Unit,
     onClose: () -> Unit,
@@ -513,7 +631,11 @@ private fun AppTitleBar(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .dragWindow(window) { onToggleMaximize() },
+                .dragWindow(
+                    window = window,
+                    onBeforeDrag = onDragStartFromMaximized,
+                    onDoubleClick = onToggleMaximize,
+                ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (appIcon != null) {
@@ -581,6 +703,7 @@ private fun AppTitleBar(
  */
 private fun Modifier.dragWindow(
     window: java.awt.Window,
+    onBeforeDrag: (Int, Int) -> Unit,
     onDoubleClick: () -> Unit,
 ): Modifier = this
     .pointerInput(window) {
@@ -596,6 +719,7 @@ private fun Modifier.dragWindow(
             onDragStart = {
                 val p = java.awt.MouseInfo.getPointerInfo()?.location
                 if (p != null) {
+                    onBeforeDrag(p.x, p.y)
                     startPointerX = p.x
                     startPointerY = p.y
                 }
@@ -614,6 +738,27 @@ private fun Modifier.dragWindow(
             },
         )
     }
+
+/** 获取窗口当前所在显示器的可用工作区（扣除 Windows 任务栏区域，放大时不遮挡任务栏）。 */
+private fun currentScreenWorkArea(window: java.awt.Window): java.awt.Rectangle {
+    val gc = window.graphicsConfiguration
+        ?: java.awt.GraphicsEnvironment.getLocalGraphicsEnvironment().defaultScreenDevice.defaultConfiguration
+    val b = gc.bounds
+    val insets = java.awt.Toolkit.getDefaultToolkit().getScreenInsets(gc)
+    return java.awt.Rectangle(
+        b.x + insets.left,
+        b.y + insets.top,
+        (b.width - insets.left - insets.right).coerceAtLeast(620),
+        (b.height - insets.top - insets.bottom).coerceAtLeast(420),
+    )
+}
+
+private fun defaultCenteredBounds(window: java.awt.Window): java.awt.Rectangle {
+    val work = currentScreenWorkArea(window)
+    val w = 880.coerceAtMost(work.width)
+    val h = 560.coerceAtMost(work.height)
+    return java.awt.Rectangle(work.x + (work.width - w) / 2, work.y + (work.height - h) / 2, w, h)
+}
 
 /** 保证窗口至少有一块留在某个屏幕内。 */
 private fun clampToScreen(window: java.awt.Window, x: Int, y: Int): Pair<Int, Int> {

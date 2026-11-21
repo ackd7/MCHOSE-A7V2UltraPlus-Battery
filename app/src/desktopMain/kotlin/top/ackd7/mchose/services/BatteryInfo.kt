@@ -19,7 +19,6 @@ data class BatteryInfo(
     var raw: String = "",
     var error: String = "",
     var updatedAt: Long = 0L,
-    var strategy: String = "",
     var lastPath: String = "",
     /** 本次读取失败，显示的是上一次成功读数（设备休眠/离线）。 */
     var stale: Boolean = false,

@@ -3,13 +3,9 @@ package top.ackd7.mchose.ui
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.CubicBezierEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -17,7 +13,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +40,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -56,10 +55,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -417,11 +416,10 @@ private fun BatteryHeroCard(
 
                 Spacer(Modifier.height(18.dp))
 
-                // HyperOS 透明感宽幅胶囊电量条
+                // HyperOS 纯色宽幅胶囊电量条
                 HyperOsCapsuleMeter(
                     fraction = animatedFrac,
                     fillColor = tone,
-                    charging = battery.charging && !sleeping,
                 )
             }
 
@@ -461,12 +459,11 @@ private fun BatteryHeroCard(
     }
 }
 
-/** HyperOS 胶囊电量条（与托盘透明胶囊电池遥相呼应）。 */
+/** HyperOS 纯色胶囊电量条。 */
 @Composable
 private fun HyperOsCapsuleMeter(
     fraction: Float,
     fillColor: Color,
-    charging: Boolean,
 ) {
     val c = rememberMochiColors()
     val shape = RoundedCornerShape(999.dp)
@@ -876,6 +873,21 @@ private fun MousePage(state: MouseConfigUiState, wide: Boolean) {
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             MiniStepButton("-100") { state.stepStageValue(state.activeDpiIndex, -100) }
+                            val currentText = state.dpiText[state.activeDpiIndex]
+                            val fieldState = rememberTextFieldState(initialText = currentText)
+                            LaunchedEffect(state.activeDpiIndex, currentText) {
+                                if (fieldState.text.toString() != currentText) {
+                                    fieldState.setTextAndPlaceCursorAtEnd(currentText)
+                                }
+                            }
+                            LaunchedEffect(state.activeDpiIndex) {
+                                snapshotFlow { fieldState.text.toString() }.collect { input ->
+                                    val filtered = input.filter { it.isDigit() }.take(5)
+                                    if (filtered != state.dpiText[state.activeDpiIndex]) {
+                                        state.dpiText[state.activeDpiIndex] = filtered
+                                    }
+                                }
+                            }
                             Box(
                                 modifier = Modifier
                                     .width(74.dp)
@@ -886,12 +898,14 @@ private fun MousePage(state: MouseConfigUiState, wide: Boolean) {
                                 contentAlignment = Alignment.CenterEnd,
                             ) {
                                 BasicTextField(
-                                    value = state.dpiText[state.activeDpiIndex],
-                                    onValueChange = { input ->
-                                        state.dpiText[state.activeDpiIndex] =
-                                            input.filter { it.isDigit() }.take(5)
+                                    state = fieldState,
+                                    lineLimits = TextFieldLineLimits.SingleLine,
+                                    inputTransformation = InputTransformation {
+                                        val clean = asCharSequence().filter { it.isDigit() }.take(5)
+                                        if (clean.toString() != asCharSequence().toString()) {
+                                            replace(0, length, clean)
+                                        }
                                     },
-                                    singleLine = true,
                                     textStyle = TextStyle(
                                         fontSize = 13.5.sp,
                                         fontWeight = FontWeight.SemiBold,
@@ -1419,24 +1433,12 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
-    "3.3.0-beta.4" to listOf(
-        "移除主页电量数字背景泛光与各处渐变高光，所有卡片、按钮、电量条与标签栏统一改为干净纯色",
-        "加大任务栏托盘小图标数字与圆角方框之间的内边距，视觉更舒展不贴边",
-    ),
-    "3.3.0-beta.3" to listOf(
-        "修复 4K / 高 DPI 缩放（如 175% / 200%）下托盘图标模糊的问题：改用 MultiResolutionImage 1:1 物理像素直绘",
-        "收紧托盘边框外边距并大幅放大 Segoe UI 粗体数字字号，任务栏清晰度与视觉大小显著提升",
-    ),
-    "3.3.0-beta.2" to listOf(
-        "任务栏托盘图标升级为 1:1 圆角正方形透明边框 + 超大号数字，小尺寸清晰度大幅提升",
-        "充电时右上角显示翠绿圆形闪电角标，不挤占中央数字空间；休眠保持 Zzz 透明方框",
-    ),
-    "3.3.0-beta.1" to listOf(
-        "参考 miuix 与 mochi-compose 全新重设计 UI：G2 连续超椭圆、Liquid Glass 液态玻璃质感与弹簧动效",
-        "全新扁平化无线鼠标应用图标 + HyperOS 透明胶囊电池托盘图标（休眠显示 Zzz）",
-        "电量主页新增环境光晕 Hero 卡片、HyperOS 宽幅胶囊进度条与分段刷新间隔切换",
-        "鼠标页升级为 3×2 可视化 DPI 档位与回报率矩阵，支持快捷预设与 ±100 微调",
-        "设置页升级为可视化分段外观切换与平铺低电量阈值选择",
+    "4.0.0" to listOf(
+        "全新纯色超椭圆 UI（参考 miuix × mochi-compose）：G2 连续圆角、3×2 可视化 DPI 与回报率矩阵、分段外观与刷新切换",
+        "全新扁平化无线鼠标应用图标，安装包显式绑定独立图标并自动刷新 Windows 桌面图标缓存",
+        "全新 4K 高清 1:1 托盘小图标：圆角正方形透明边框 + 大号 Segoe UI 粗体数字 + 充电闪电角标 + 休眠 Zzz",
+        "新增缩小、放大/还原、关闭与打开窗口的流畅过渡动画（放大精准贴合工作区不遮挡任务栏）",
+        "精简仓库无用文件与冗余依赖，全量代码审查修复线程同步、单实例唤醒、日志轮转等细节",
     ),
     "3.2.4" to listOf(
         "新增单实例限制：重复打开时自动唤醒已在托盘运行的窗口",

@@ -1,4 +1,4 @@
-rootProject.name = "A7Battery"
+rootProject.name = "MCHOSE-A7V2UltraPlus-Battery"
 
 pluginManagement {
     repositories {

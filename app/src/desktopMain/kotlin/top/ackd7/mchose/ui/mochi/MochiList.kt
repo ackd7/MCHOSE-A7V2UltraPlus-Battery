@@ -40,7 +40,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -67,9 +66,6 @@ data class MochiColors(
     val card: Color,
     val cardHover: Color,
     val cardBorder: Color,
-    val glassSurface: Color,
-    val glassBorderTop: Color,
-    val glassBorderBottom: Color,
     val segmentTrack: Color,
     val segmentThumb: Color,
     val text: Color,
@@ -92,9 +88,6 @@ fun rememberMochiColors(): MochiColors {
         card = if (isDark) Color(0xFF1C1F26) else Color(0xFFFFFFFF),
         cardHover = if (isDark) Color(0xFF252A34) else Color(0xFFF3F6FA),
         cardBorder = if (isDark) Color.White.copy(alpha = 0.08f) else Color.Black.copy(alpha = 0.06f),
-        glassSurface = if (isDark) Color(0xE01F232C) else Color(0xEBFFFFFF),
-        glassBorderTop = if (isDark) Color.White.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.92f),
-        glassBorderBottom = if (isDark) Color.White.copy(alpha = 0.04f) else Color.Black.copy(alpha = 0.08f),
         segmentTrack = if (isDark) Color(0xFF13161C) else Color(0xFFEAEFF6),
         segmentThumb = if (isDark) Color(0xFF2B313E) else Color(0xFFFFFFFF),
         text = scheme.onSurface,

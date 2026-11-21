@@ -12,11 +12,9 @@ import java.io.File
 data class AppSettings(
     var refreshSeconds: Int = 30,
     var autoStart: Boolean = false,
-    var startMinimized: Boolean = false,
     var showPercentInTray: Boolean = true,
     var checkUpdates: Boolean = true,
     var lastUpdateCheck: String = "",
-    var skippedVersion: String = "",
     var dpiStages: IntArray = intArrayOf(400, 800, 1600, 3200, 6400, 26000),
     var activeDpiIndex: Int = 2,
     var rateHz: Int = 1000,

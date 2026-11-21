@@ -7,12 +7,12 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 3.3.0
+// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 4.0.0
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突；
 // Windows MSI (jpackage) 要求纯三段数字 X.Y.Z，自动剥离 -beta.1 等预发布后缀。
 val rawAppVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "3.3.0"
+    ?: "4.0.0"
 val appVersion: String = rawAppVersion.substringBefore('-').substringBefore('+')
 
 kotlin {
@@ -23,23 +23,19 @@ kotlin {
     jvmToolchain(21)
 
     sourceSets {
-        val desktopMain by getting
-
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material3)
             implementation(compose.ui)
-            implementation(compose.components.resources)
 
             implementation(libs.kotlinx.serialization.json)
 
             // miuix —— MIUI/HyperOS 设计语言（配色 token + 组件）
             implementation(libs.miuix.ui)
-            implementation(libs.miuix.preference)
             implementation(libs.miuix.icons)
         }
 
+        val desktopMain = getByName("desktopMain")
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.jna)

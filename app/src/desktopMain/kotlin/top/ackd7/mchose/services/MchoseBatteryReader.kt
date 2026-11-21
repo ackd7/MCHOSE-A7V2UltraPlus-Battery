@@ -64,7 +64,7 @@ class MchoseBatteryReader {
     }
 
     private fun readOne(dev: HidDeviceInfo): BatteryInfo {
-        val r = BatteryInfo(updatedAt = System.currentTimeMillis(), strategy = "poll")
+        val r = BatteryInfo(updatedAt = System.currentTimeMillis())
         HidNative.HidSession(dev.path, maxOf(dev.inputReportLength, featureLen)).use { s ->
             for (cycle in 0 until 3) {
                 if (cycle > 0) Thread.sleep(150)

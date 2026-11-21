@@ -21,29 +21,29 @@
 - 直接读取 HID 厂商协议返回的 **0–100% 原始电量值**，不四舍五入、不估算
 - 区分 **充电中 / 放电中**，识别 **USB 有线 / 2.4G 无线 / 蓝牙**
 - 鼠标休眠时固件会返回全 0，程序**保留上一次成功读数与实际更新时间**并标注「休眠中」，不会突然变成 `--`
-- 托盘图标直接绘制百分比数字（按电量档位变色，充电时带闪电标志）
+- **4K 高清 1:1 托盘小图标**：圆角正方形透明边框 + 大号 `Segoe UI` 粗体数字（按高/充/中/低电量变色，充电时右上角带翠绿闪电角标，休眠显示 `Zzz`），自动适配 Windows 深/浅任务栏与任意 DPI 缩放
 
 **鼠标配置能改**
 
-- **DPI**：六个档位直接列出各自数值，点一行即设为当前档；可选预设或**自定义任意 100–42000**
-- **回报率**：125 / 500 / 1000 / 2000 / 4000 / 8000 Hz 可选，写入后掉电不丢
+- **DPI**：3×2 可视化档位矩阵一目了然，点选即切换当前档；提供快捷预设 Chips、完整下拉及**自定义 100–42000（支持 ±100 微调）**
+- **回报率**：3×2 可视化胶囊矩阵（125 / 500 / 1000 / 2000 / 4000 / 8000 Hz），写入后掉电不丢
 - 启动时**自动读取**当前配置，切页或重开窗口不丢失；HID 读写加互斥锁，避免与电量轮询并发冲突
 
 **用起来省心**
 
-- **托盘常驻**：左键点击托盘图标即可打开/还原主面板，右键菜单提供打开 / 立即刷新 / 退出
+- **单实例限制**：重复打开快捷方式自动唤醒已在托盘运行的窗口，不会多开冲突
+- **托盘常驻**：左键点击托盘图标即可打开/还原主面板，右键菜单提供状态摘要、打开 / 立即刷新 / 退出
 - **静默开机自启**：写当前用户启动项（无需管理员权限），开机以 `--minimized` 静默驻留任务栏托盘，不主动弹出主界面
-- **低电量提醒**：电量降到阈值（默认 30%，可在 10–50% 间选）时通过托盘气泡提醒一次，电量回升后自动重新待命
-- **刷新间隔**：15 / 30 / 90 秒可选，切换后立即生效；手动刷新在后台异步执行不卡界面
+- **低电量提醒**：电量降到阈值（默认 30%，7 档快捷按钮在 10–50% 间一键选择）时通过托盘气泡提醒一次，电量回升后自动重新待命
+- **刷新间隔**：分段滑动胶囊 15 / 30 / 90 秒一键切换即时生效；手动刷新在后台异步执行不卡界面
 - **自动检查更新**：每次启动检查 GitHub Releases，发现新版本在设置里提示（可关闭），设置页可查看**历史版本更新内容**
 
-**界面**
+**界面与动效**
 
-- 横向自适应窗口：宽屏左右两列，窄屏自动回退单列
-- **浅色 / 深色 / 跟随系统**三种外观，主窗口与托盘右键菜单同步即时生效
-- 三页之间横向滑动切换（末端带轻微回弹）；下拉选项带缩放弹出动画
-- 无边框窗口：最小化 / 最大化 / 关闭做在界面里，标题栏可拖动、双击最大化，支持 Windows 11 圆角
-- 托盘右键菜单由 Compose 自绘，中文在任何系统环境下都不会出现方块
+- 纯色 **G2 连续超椭圆**卡片设计，横向自适应窗口（宽屏两列 / 窄屏单列）
+- **浅色 / 深色 / 跟随系统**三段胶囊外观切换，主窗口与托盘右键菜单同步即时生效
+- 完整的**打开 / 缩小 / 放大（不遮挡任务栏）/ 关闭**窗口过渡动画，配合弹簧按压与滑动切页动效
+- 无边框融入式标题栏：带应用图标与实时电量微胶囊，支持拖动、双击放大与 Windows 11 圆角
 
 ### 支持设备
 
@@ -98,10 +98,10 @@ DPI / 回报率（同一协议族的厂商命令）：
 .\gradlew.bat :app:compileKotlinDesktop
 
 # 打包 MSI（产物：app/build/compose/binaries/main/msi/）
-.\gradlew.bat :app:packageMsi -PappVersion=3.2.4
+.\gradlew.bat :app:packageMsi -PappVersion=4.0.0
 
 # 打中文安装向导（需先装 NSIS，产物：dist/）
-makensis /DAPP_VERSION=3.2.4 installer/setup.nsi
+makensis /DAPP_VERSION=4.0.0 /DPRODUCT_VERSION=4.0.0 installer/setup.nsi
 
 # 硬件自检（枚举设备、读电量、读配置）
 .\gradlew.bat :app:diag
@@ -127,7 +127,8 @@ app/src/desktopMain/kotlin/top/ackd7/mchose/
     ├── App.kt                  # 三个页面 + 关于弹窗
     ├── Theme.kt                # miuix 主题（浅色/深色/跟随系统）
     └── mochi/                  # 按 mochi-compose 规范移植的组件
-        ├── MochiList.kt        # 分组卡片 / 行 / 开关 / 下拉
+        ├── MochiMotion.kt      # G2 连续超椭圆、按压缩放、分段胶囊与状态标签
+        ├── MochiList.kt        # 分组卡片 / 行 / 开关 / 主按钮 / 下拉
         └── MochiTabBar.kt      # 悬浮胶囊标签栏
 installer/setup.nsi             # NSIS 中文安装向导
 CHANGELOG.md                    # 版本更新记录（Release 说明由此生成）
@@ -233,10 +234,10 @@ Requires **JDK 21** (`gradlew` downloads Gradle 9.x automatically).
 .\gradlew.bat :app:compileKotlinDesktop
 
 # Build MSI package (output: app/build/compose/binaries/main/msi/)
-.\gradlew.bat :app:packageMsi -PappVersion=3.2.4
+.\gradlew.bat :app:packageMsi -PappVersion=4.0.0
 
 # Build NSIS Setup installer (requires NSIS, output: dist/)
-makensis /DAPP_VERSION=3.2.4 installer/setup.nsi
+makensis /DAPP_VERSION=4.0.0 /DPRODUCT_VERSION=4.0.0 installer/setup.nsi
 
 # Run hardware diagnostics (enumerate HID devices, read battery & config)
 .\gradlew.bat :app:diag
