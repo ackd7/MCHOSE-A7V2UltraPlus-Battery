@@ -65,7 +65,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.2.0"
+const val APP_VERSION = "4.2.1"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -254,13 +254,35 @@ fun main(args: Array<String>) {
             appLog("窗口已销毁并退回托盘（释放 GPU 画布缓存）")
         }
 
+        // 纯 AWT 零渲染保活句柄（非 Compose 窗口，无 Skiko/DX12 显存开销），
+        // 防止所有 Compose 窗口销毁后触发 AWTAutoShutdown 终止 EDT 导致进程退出
+        val awtKeepAlive = remember {
+            runCatching {
+                java.awt.Frame().apply {
+                    isUndecorated = true
+                    focusableWindowState = false
+                    type = java.awt.Window.Type.UTILITY
+                    setSize(0, 0)
+                    addNotify()
+                }
+            }.getOrNull()
+        }
+
+        // 保持 Compose Recomposer.join() 在零窗口后台驻留时持续挂起，直至显式调用 exitApplication()
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.awaitCancellation()
+        }
+
         fun shutdownApp() {
             menuVisible = false
             isVisible = false
             tray?.close()
             monitor.stop()
             singleInstance.close()
-            javax.swing.SwingUtilities.invokeLater { exitApplication() }
+            javax.swing.SwingUtilities.invokeLater {
+                runCatching { awtKeepAlive?.dispose() }
+                exitApplication()
+            }
         }
 
         // 当主窗口与托盘菜单均关闭（纯后台驻留）时，延迟触发一次 GC 与 Windows 工作集整理

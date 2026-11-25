@@ -7,12 +7,12 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 4.2.0
+// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 4.2.1
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突；
 // Windows MSI (jpackage) 要求纯三段数字 X.Y.Z，自动剥离 -beta.1 等预发布后缀。
 val rawAppVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "4.2.0"
+    ?: "4.2.1"
 val appVersion: String = rawAppVersion.substringBefore('-').substringBefore('+')
 
 kotlin {

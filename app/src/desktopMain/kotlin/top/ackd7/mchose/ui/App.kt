@@ -1492,6 +1492,9 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "4.2.1" to listOf(
+        "修复关闭主窗口释放 GPU 内存后因 Compose Recomposer 与 AWT 无活跃窗口导致整个程序自动退出的问题",
+    ),
     "4.2.0" to listOf(
         "大幅降低后台内存占用（由 ~370 MB 降至约 15–45 MB）：主窗口与右键菜单改为按需挂载，关闭回托盘时直接销毁窗口并释放 4K Direct3D 12 显存画布",
         "收紧 JVM 堆参数并切换至极轻量 SerialGC，空闲堆内存即时归还系统；退回后台自动整理物理工作集",
