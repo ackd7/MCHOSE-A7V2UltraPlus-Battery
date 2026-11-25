@@ -73,14 +73,40 @@ class NativeTrayIcon : AutoCloseable {
         SystemTray.getSystemTray().add(trayIcon)
     }
 
+    private var iconInitialized = false
+    private var lastPercent: Int? = null
+    private var lastCharging: Boolean = false
+    private var lastLightTaskbar: Boolean = false
+    private var lastNativeSize: Int = -1
+    private var lastAccent: Color = accent
+
     /** 托盘气泡通知（低电量提醒等）。 */
     fun notify(title: String, text: String) {
         runCatching { trayIcon.displayMessage(title, text, TrayIcon.MessageType.WARNING) }
     }
 
     fun setIcon(percent: Int?, charging: Boolean, tip: String) {
-        trayIcon.image = createTrayImage(percent, charging)
-        trayIcon.toolTip = tip
+        val lightTaskbar = isLightTaskbar()
+        val nativeSize = nativeTrayPixelSize()
+        val curAccent = accent
+        if (!iconInitialized ||
+            percent != lastPercent ||
+            charging != lastCharging ||
+            lightTaskbar != lastLightTaskbar ||
+            nativeSize != lastNativeSize ||
+            curAccent != lastAccent
+        ) {
+            iconInitialized = true
+            lastPercent = percent
+            lastCharging = charging
+            lastLightTaskbar = lightTaskbar
+            lastNativeSize = nativeSize
+            lastAccent = curAccent
+            trayIcon.image = createTrayImage(percent, charging, lightTaskbar, nativeSize)
+        }
+        if (trayIcon.toolTip != tip) {
+            trayIcon.toolTip = tip
+        }
     }
 
     private fun isLightTaskbar(): Boolean = runCatching {
@@ -99,12 +125,15 @@ class NativeTrayIcon : AutoCloseable {
         (16.0 * scale).roundToInt().coerceIn(16, 64)
     }.getOrDefault(32)
 
-    private fun createTrayImage(percent: Int?, charging: Boolean): Image {
-        val lightTaskbar = isLightTaskbar()
-        val nativeSize = nativeTrayPixelSize()
+    private fun createTrayImage(
+        percent: Int?,
+        charging: Boolean,
+        lightTaskbar: Boolean = isLightTaskbar(),
+        nativeSize: Int = nativeTrayPixelSize(),
+    ): Image {
         val accentCopy = accent
         return object : AbstractMultiResolutionImage() {
-            private val cache = HashMap<Int, BufferedImage>()
+            private val cache = HashMap<Int, BufferedImage>(2)
 
             override fun getBaseImage(): Image =
                 cache.getOrPut(nativeSize) { renderAtSize(nativeSize, percent, charging, lightTaskbar, accentCopy) }

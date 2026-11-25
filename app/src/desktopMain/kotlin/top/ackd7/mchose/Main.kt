@@ -65,7 +65,7 @@ import top.ackd7.mchose.ui.rememberAppIconBitmap
 import top.ackd7.mchose.ui.themeModeOf
 import top.yukonga.miuix.kmp.basic.Text
 
-const val APP_VERSION = "4.1.5"
+const val APP_VERSION = "4.2.0"
 
 /** 软件显示名称（窗口标题 / 托盘 / 关于页 / 安装包统一使用）。 */
 const val APP_NAME = "MCHOSE A7 V2 Ultra+ Battery"
@@ -191,10 +191,11 @@ fun main(args: Array<String>) {
         var battery by remember { mutableStateOf(BatteryInfo()) }
         var themeMode by remember { mutableStateOf(settings.themeMode) }
         var isVisible by remember { mutableStateOf(!startMinimized) }
-        // 托盘右键菜单（Compose 自绘窗口，规避 AWT 菜单中文乱码）
+        // 托盘右键菜单（按需挂载的 Compose 小窗口，平时不占用任何 GPU 画布内存）
         var menuVisible by remember { mutableStateOf(false) }
+        // 记录本进程内已成功同步过鼠标配置的连接模式（避免每次从托盘重开窗口都重复发 12 67 请求）
+        var syncedMouseMode by remember { mutableStateOf<top.ackd7.mchose.services.ConnectionMode?>(null) }
         // 每次「从托盘打开」都自增，强制在 AWT 层把窗口恢复出来
-        // （只靠 isVisible 布尔值不够：窗口被最小化时 isVisible 仍是 true，置 true 是空操作）
         var showToken by remember { mutableIntStateOf(0) }
 
         fun syncTrayIcon(info: BatteryInfo) {
@@ -221,12 +222,24 @@ fun main(args: Array<String>) {
             }
         }
 
-        // 横向窗口；--narrow 为开发用（验证窄屏单列布局）
+        // 横向窗口状态放在外层，销毁窗口后再重开仍能保留上次拖动后的坐标与尺寸
         val windowState = rememberWindowState(
             size = if (args.contains("--narrow")) DpSize(460.dp, 700.dp)
             else DpSize(880.dp, 560.dp),
         )
         val menuState = rememberWindowState(size = DpSize(196.dp, 184.dp))
+
+        fun computeTrayMenuPosition(menuW: Int = 196, menuH: Int = 184): Pair<Int, Int> {
+            val pointer = java.awt.MouseInfo.getPointerInfo()
+            val p = pointer?.location ?: java.awt.Point(100, 100)
+            val bounds = pointer?.device?.defaultConfiguration?.bounds
+                ?: java.awt.Rectangle(java.awt.Toolkit.getDefaultToolkit().screenSize)
+            val minX = bounds.x
+            val maxX = (bounds.x + bounds.width - menuW).coerceAtLeast(minX)
+            val minY = bounds.y
+            val maxY = (bounds.y + bounds.height - menuH).coerceAtLeast(minY)
+            return p.x.coerceIn(minX, maxX) to (p.y - menuH - 8).coerceIn(minY, maxY)
+        }
 
         fun openMainWindow() {
             menuVisible = false
@@ -238,15 +251,26 @@ fun main(args: Array<String>) {
             menuVisible = false
             windowState.isMinimized = false
             isVisible = false
-            appLog("窗口已隐藏到托盘")
+            appLog("窗口已销毁并退回托盘（释放 GPU 画布缓存）")
         }
 
         fun shutdownApp() {
             menuVisible = false
+            isVisible = false
             tray?.close()
             monitor.stop()
             singleInstance.close()
             javax.swing.SwingUtilities.invokeLater { exitApplication() }
+        }
+
+        // 当主窗口与托盘菜单均关闭（纯后台驻留）时，延迟触发一次 GC 与 Windows 工作集整理
+        LaunchedEffect(isVisible, menuVisible) {
+            if (!isVisible && !menuVisible) {
+                kotlinx.coroutines.delay(900L)
+                withContext(Dispatchers.IO) {
+                    trimProcessMemory()
+                }
+            }
         }
 
         // 所有副作用只做一次
@@ -258,7 +282,15 @@ fun main(args: Array<String>) {
                 val t = NativeTrayIcon()
                 t.accent = java.awt.Color(0x34, 0x82, 0xFF)
                 t.onOpen = { openMainWindow() }
-                t.onMenu = { menuVisible = !menuVisible }
+                t.onMenu = {
+                    if (!menuVisible) {
+                        val (mx, my) = computeTrayMenuPosition()
+                        menuState.position = androidx.compose.ui.window.WindowPosition(mx.dp, my.dp)
+                        menuVisible = true
+                    } else {
+                        menuVisible = false
+                    }
+                }
                 t.onRefresh = { monitor.requestRefresh() }
                 t.onExit = { shutdownApp() }
                 tray = t
@@ -321,116 +353,107 @@ fun main(args: Array<String>) {
                 updateInfo = info
                 appLog("检查更新：latest=${info.latestVersion} available=${info.available} err=${info.error}")
             }
+
+            if (!isVisible && !menuVisible) {
+                withContext(Dispatchers.IO) { trimProcessMemory() }
+            }
         }
 
-        Window(
-            onCloseRequest = { hideMainWindow() },
-            title = APP_NAME,
-            state = windowState,
-            undecorated = true,
-            visible = isVisible,
-        ) {
-            val win = window
+        // 主窗口按需挂载：关闭隐藏回托盘时直接销毁窗口与 4K DirectX 显存画布，大幅释放后台内存
+        if (isVisible) {
+            Window(
+                onCloseRequest = { hideMainWindow() },
+                title = APP_NAME,
+                state = windowState,
+                undecorated = true,
+            ) {
+                val win = window
 
-            LaunchedEffect(Unit) {
-                runCatching {
-                    val iconStream = ClassLoader.getSystemResourceAsStream("app.png")
-                    if (iconStream != null) {
-                        win.iconImage = iconStream.use { javax.imageio.ImageIO.read(it) }
+                LaunchedEffect(Unit) {
+                    runCatching {
+                        val iconStream = ClassLoader.getSystemResourceAsStream("app.png")
+                        if (iconStream != null) {
+                            win.iconImage = iconStream.use { javax.imageio.ImageIO.read(it) }
+                        }
                     }
-                }
-                runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
-                runCatching { applyRoundedCorners(win) }
-                runCatching { win.rootPane.border = null }
-            }
-
-            LaunchedEffect(isVisible) {
-                if (isVisible) {
+                    runCatching { win.minimumSize = java.awt.Dimension(620, 420) }
                     runCatching { applyRoundedCorners(win) }
+                    runCatching { win.rootPane.border = null }
+                    javax.swing.SwingUtilities.invokeLater {
+                        restoreAndFocusWindow(win, false)
+                    }
                 }
-            }
 
-            // 从托盘打开时强制恢复（含取消最小化 / Win32 还原置前 / 抢焦点）
-            LaunchedEffect(showToken) {
-                if (showToken == 0) return@LaunchedEffect
-                val wasIconified = windowState.isMinimized ||
-                    (win.extendedState and java.awt.Frame.ICONIFIED) != 0
-                windowState.isMinimized = false
-                javax.swing.SwingUtilities.invokeLater {
-                    restoreAndFocusWindow(win, wasIconified)
-                    appLog("托盘恢复窗口 #$showToken（wasIconified=$wasIconified, state=${win.extendedState}, visible=${win.isVisible}）")
+                // 窗口已打开状态下再次点击托盘时置前激活
+                LaunchedEffect(showToken) {
+                    if (showToken == 0) return@LaunchedEffect
+                    val wasIconified = windowState.isMinimized ||
+                        (win.extendedState and java.awt.Frame.ICONIFIED) != 0
+                    windowState.isMinimized = false
+                    javax.swing.SwingUtilities.invokeLater {
+                        restoreAndFocusWindow(win, wasIconified)
+                        appLog("托盘恢复窗口 #$showToken（wasIconified=$wasIconified, state=${win.extendedState}, visible=${win.isVisible}）")
+                    }
                 }
-            }
 
-            App(
-                settings = settings,
-                monitor = monitor,
-                battery = battery,
-                updateInfo = updateInfo,
-                themeMode = themeMode,
-                onThemeModeChange = { themeMode = it },
-                onShowPercentChange = { syncTrayIcon(battery) },
-                titleBar = {
-                    AppTitleBar(
-                        window = win,
-                        title = APP_NAME,
-                        subtitle = "v$APP_VERSION",
-                        battery = battery,
-                        onClose = { hideMainWindow() },
-                    )
-                },
-                onExitRequested = { shutdownApp() },
-                initialPage = initialPage,
-            )
+                App(
+                    settings = settings,
+                    monitor = monitor,
+                    battery = battery,
+                    updateInfo = updateInfo,
+                    themeMode = themeMode,
+                    onThemeModeChange = { themeMode = it },
+                    onShowPercentChange = { syncTrayIcon(battery) },
+                    syncedMouseMode = syncedMouseMode,
+                    onMouseSynced = { syncedMouseMode = it },
+                    titleBar = {
+                        AppTitleBar(
+                            window = win,
+                            title = APP_NAME,
+                            subtitle = "v$APP_VERSION",
+                            battery = battery,
+                            onClose = { hideMainWindow() },
+                        )
+                    },
+                    onExitRequested = { shutdownApp() },
+                    initialPage = initialPage,
+                )
+            }
         }
 
-        // 托盘右键菜单：常驻的 Compose 小窗口（只切 visible，避免销毁窗口导致应用退出）
-        Window(
-            onCloseRequest = { menuVisible = false },
-            title = "menu",
-            undecorated = true,
-            resizable = false,
-            alwaysOnTop = true,
-            visible = menuVisible,
-            state = menuState,
-        ) {
-            val win = window
-            LaunchedEffect(Unit) {
-                appLog("托盘菜单已创建")
-                runCatching { applyRoundedCorners(win) }
-                runCatching { win.rootPane.border = null }
-                win.addWindowFocusListener(object : java.awt.event.WindowAdapter() {
-                    override fun windowLostFocus(e: java.awt.event.WindowEvent?) {
-                        menuVisible = false
-                    }
-                })
-            }
-            // 每次弹出时移动到鼠标所在屏幕的指针上方（兼容多显示器与副屏任务栏）
-            LaunchedEffect(menuVisible) {
-                if (menuVisible) {
-                    val pointer = java.awt.MouseInfo.getPointerInfo()
-                    val p = pointer?.location ?: java.awt.Point(100, 100)
-                    val bounds = pointer?.device?.defaultConfiguration?.bounds
-                        ?: java.awt.Rectangle(java.awt.Toolkit.getDefaultToolkit().screenSize)
-                    val minX = bounds.x
-                    val maxX = (bounds.x + bounds.width - win.width).coerceAtLeast(minX)
-                    val minY = bounds.y
-                    val maxY = (bounds.y + bounds.height - win.height).coerceAtLeast(minY)
-                    val x = p.x.coerceIn(minX, maxX)
-                    val y = (p.y - win.height - 8).coerceIn(minY, maxY)
+        // 托盘右键菜单按需挂载：平时不常驻任何菜单窗口（AWT SystemTray + Compose awaitApplication 保持进程存活）
+        if (menuVisible) {
+            Window(
+                onCloseRequest = { menuVisible = false },
+                title = "menu",
+                undecorated = true,
+                resizable = false,
+                alwaysOnTop = true,
+                state = menuState,
+            ) {
+                val win = window
+                LaunchedEffect(Unit) {
+                    runCatching { applyRoundedCorners(win) }
+                    runCatching { win.rootPane.border = null }
+                    val (x, y) = computeTrayMenuPosition(win.width.coerceAtLeast(196), win.height.coerceAtLeast(184))
                     win.setLocation(x, y)
                     win.toFront()
                     win.requestFocus()
+                    win.addWindowFocusListener(object : java.awt.event.WindowAdapter() {
+                        override fun windowLostFocus(e: java.awt.event.WindowEvent?) {
+                            menuVisible = false
+                        }
+                    })
                     appLog("托盘菜单已显示 @ $x,$y")
                 }
-            }
-            AppTheme(themeModeOf(themeMode)) {
-                TrayMenu(
-                    battery = battery,
-                    onOpen = { openMainWindow() },
-                    onRefresh = { menuVisible = false; monitor.requestRefresh() },
-                    onExit = { shutdownApp() },
-                )
+                AppTheme(themeModeOf(themeMode)) {
+                    TrayMenu(
+                        battery = battery,
+                        onOpen = { openMainWindow() },
+                        onRefresh = { menuVisible = false; monitor.requestRefresh() },
+                        onExit = { shutdownApp() },
+                    )
+                }
             }
         }
     }
@@ -762,6 +785,31 @@ private fun restoreAndFocusWindow(win: java.awt.Frame, wasIconified: Boolean) {
         win.requestFocus()
         win.isAlwaysOnTop = false
     }.onFailure { appLog("拉起窗口异常: ${it.message}") }
+}
+
+private interface WorkingSetKernel32 : com.sun.jna.Library {
+    fun SetProcessWorkingSetSize(
+        hProcess: com.sun.jna.platform.win32.WinNT.HANDLE,
+        dwMinimumWorkingSetSize: com.sun.jna.Pointer,
+        dwMaximumWorkingSetSize: com.sun.jna.Pointer,
+    ): Boolean
+}
+
+private val workingSetKernel32: WorkingSetKernel32 by lazy {
+    com.sun.jna.Native.load("kernel32", WorkingSetKernel32::class.java)
+}
+
+/** 窗口全部卸载退回纯托盘后台时，主动执行 GC 并通知 Windows 回收闲置物理工作集页。 */
+private fun trimProcessMemory() {
+    runCatching {
+        System.gc()
+        val trimFlag = com.sun.jna.Pointer.createConstant(-1L)
+        workingSetKernel32.SetProcessWorkingSetSize(
+            com.sun.jna.platform.win32.Kernel32.INSTANCE.GetCurrentProcess(),
+            trimFlag,
+            trimFlag,
+        )
+    }
 }
 
 private val dwmApi: DwmApi by lazy {

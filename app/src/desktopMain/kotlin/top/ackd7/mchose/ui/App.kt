@@ -138,6 +138,8 @@ fun App(
     themeMode: String,
     onThemeModeChange: (String) -> Unit,
     onShowPercentChange: () -> Unit,
+    syncedMouseMode: ConnectionMode? = null,
+    onMouseSynced: (ConnectionMode) -> Unit = {},
     titleBar: @Composable () -> Unit,
     onExitRequested: () -> Unit,
     initialPage: Int = 0,
@@ -152,25 +154,31 @@ fun App(
         val canvasBg = if (c.isDark) Color(0xFF0F1218) else Color(0xFFF2F5FA)
 
         var page by remember { mutableIntStateOf(initialPage.coerceIn(0, 2)) }
-        val mouseState = rememberMouseConfigUiState(settings)
+        val mouseState = rememberMouseConfigUiState(
+            settings = settings,
+            alreadySynced = syncedMouseMode != null,
+            onSynced = onMouseSynced,
+        )
 
         LaunchedEffect(Unit) {
             top.ackd7.mchose.appLog("UI 已组合（Miuix × Mochi）")
-            mouseState.refresh(battery.mode)
+            if (syncedMouseMode == null) {
+                mouseState.refresh(battery.mode)
+            }
         }
 
-        // 开机时鼠标可能处于休眠导致首次读取失败：鼠标唤醒上线或有线/无线模式切换时自动补读一次配置
-        var syncedMode by remember { mutableStateOf(ConnectionMode.Unknown) }
+        // 开机休眠后首次唤醒上线或有线/无线模式切换时自动补读一次配置
         LaunchedEffect(battery.success, battery.stale, battery.mode) {
             if (battery.success && !battery.stale) {
-                val modeChanged = syncedMode != ConnectionMode.Unknown &&
+                val prevMode = syncedMouseMode
+                val modeChanged = prevMode != null &&
+                    prevMode != ConnectionMode.Unknown &&
                     battery.mode != ConnectionMode.Unknown &&
-                    battery.mode != syncedMode
+                    battery.mode != prevMode
                 if ((!mouseState.loaded || modeChanged) && !mouseState.busy) {
-                    syncedMode = battery.mode
                     mouseState.refresh(battery.mode)
-                } else if (mouseState.loaded && syncedMode == ConnectionMode.Unknown && battery.mode != ConnectionMode.Unknown) {
-                    syncedMode = battery.mode
+                } else if (mouseState.loaded && prevMode == ConnectionMode.Unknown && battery.mode != ConnectionMode.Unknown) {
+                    onMouseSynced(battery.mode)
                 }
             }
         }
@@ -654,20 +662,24 @@ class MouseConfigUiState(
     private val settings: AppSettings,
     private val mouse: MouseConfigService,
     private val scope: CoroutineScope,
+    alreadySynced: Boolean = false,
+    private val onSynced: (ConnectionMode) -> Unit = {},
 ) {
     val dpiText = mutableStateListOf(
         *Array(6) { i -> settings.dpiStages.getOrElse(i) { 800 }.toString() },
     )
     var activeDpiIndex by mutableIntStateOf(settings.activeDpiIndex.coerceIn(0, 5))
     var rateIndex by mutableIntStateOf(rateIndexFromHz(settings.rateHz))
-    var status by mutableStateOf("")
+    var status by mutableStateOf(
+        if (alreadySynced) "已同步鼠标配置 · 档位 ${activeDpiIndex + 1} · ${settings.rateHz} Hz" else "",
+    )
     var statusIsError by mutableStateOf(false)
     var customDpi by mutableStateOf(false)
 
     var busy by mutableStateOf(false)
         private set
 
-    var loaded by mutableStateOf(false)
+    var loaded by mutableStateOf(alreadySynced)
         private set
 
     fun stageValue(index: Int): Int = dpiText[index.coerceIn(0, 5)].trim().toIntOrNull() ?: 800
@@ -702,6 +714,7 @@ class MouseConfigUiState(
                 settings.activeDpiIndex = activeDpiIndex
                 settings.save()
                 loaded = true
+                onSynced(mode)
                 customDpi = false
                 statusIsError = false
                 val rateDesc = if (readRate >= 0) " · ${MouseConfigService.RateHz[readRate]} Hz" else ""
@@ -770,10 +783,14 @@ class MouseConfigUiState(
 }
 
 @Composable
-private fun rememberMouseConfigUiState(settings: AppSettings): MouseConfigUiState {
+private fun rememberMouseConfigUiState(
+    settings: AppSettings,
+    alreadySynced: Boolean,
+    onSynced: (ConnectionMode) -> Unit,
+): MouseConfigUiState {
     val scope = rememberCoroutineScope()
     return remember(settings) {
-        MouseConfigUiState(settings, MouseConfigService(), scope)
+        MouseConfigUiState(settings, MouseConfigService(), scope, alreadySynced, onSynced)
     }
 }
 
@@ -1475,6 +1492,11 @@ private fun SettingsPage(
 // ---------------- Liquid Glass 关于弹窗 ----------------
 
 private val RecentChanges = listOf(
+    "4.2.0" to listOf(
+        "大幅降低后台内存占用（由 ~370 MB 降至约 15–45 MB）：主窗口与右键菜单改为按需挂载，关闭回托盘时直接销毁窗口并释放 4K Direct3D 12 显存画布",
+        "收紧 JVM 堆参数并切换至极轻量 SerialGC，空闲堆内存即时归还系统；退回后台自动整理物理工作集",
+        "新增托盘图标状态缓存去重，日常轮询零重复位图分配，所有原有功能与体验保持不变",
+    ),
     "4.1.5" to listOf(
         "紧急修复随机卡死、闪退及无法打开（ntdll 0xC0000374 / MSCTF 0xC0000005 堆破坏）：重构 HID 异步 OVERLAPPED ReadFile 为持久化原生堆内存，彻底消除 JNA 临时缓冲区提前释放被内核写穿的问题",
         "优化 HID 设备枚举 PreparsedData 释放路径并缓存 DWM 圆角接口实例",

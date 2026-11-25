@@ -7,12 +7,12 @@ plugins {
     alias(libs.plugins.kotlinSerialization)
 }
 
-// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 4.1.5
+// 版本号：优先取 -PappVersion=xxx，其次取环境变量 APP_VERSION，默认 4.2.0
 // 注意：不能用 -Pversion，因为它与 Gradle 内建的 project.version 属性冲突；
 // Windows MSI (jpackage) 要求纯三段数字 X.Y.Z，自动剥离 -beta.1 等预发布后缀。
 val rawAppVersion: String = (project.findProperty("appVersion") as String?)
     ?: System.getenv("APP_VERSION")
-    ?: "4.1.5"
+    ?: "4.2.0"
 val appVersion: String = rawAppVersion.substringBefore('-').substringBefore('+')
 
 kotlin {
@@ -49,8 +49,21 @@ kotlin {
 compose.desktop {
     application {
         mainClass = "top.ackd7.mchose.MainKt"
-        // JNA 需要 native access 权限（JDK 17+）
-        jvmArgs += listOf("--enable-native-access=ALL-UNNAMED", "-Dfile.encoding=UTF-8")
+        // JNA 需要 native access 权限（JDK 17+）；
+        // 托盘常驻内存优化：使用极低元数据开销的 SerialGC，收紧堆上限并在 GC 后立即向系统归还空闲物理页
+        jvmArgs += listOf(
+            "--enable-native-access=ALL-UNNAMED",
+            "-Dfile.encoding=UTF-8",
+            "-Xms16m",
+            "-Xmx96m",
+            "-XX:+UseSerialGC",
+            "-XX:MinHeapFreeRatio=10",
+            "-XX:MaxHeapFreeRatio=20",
+            "-XX:-ShrinkHeapInSteps",
+            "-XX:MinMetaspaceFreeRatio=5",
+            "-XX:MaxMetaspaceFreeRatio=15",
+            "-Dskiko.gpu.resourceCacheLimit=33554432",
+        )
 
         nativeDistributions {
             // MSI 作为备用安装包；主推 dist 里的 NSIS Setup（中文向导，可选桌面快捷方式）
